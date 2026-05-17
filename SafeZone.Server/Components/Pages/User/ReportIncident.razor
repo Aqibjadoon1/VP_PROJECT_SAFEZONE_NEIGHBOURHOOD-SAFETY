@@ -1,0 +1,575 @@
+@page "/user/report-incident"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject NavigationManager Navigation
+@inject IIncidentService IncidentSvc
+@inject ToastService ToastSvc
+@inject AuthenticationStateProvider AuthState
+@inject UserManager<User> UserManager
+
+<div class="ambient-glow-2"></div>
+
+<div class="pt-24 pb-8 px-4 max-w-4xl mx-auto">
+    <div class="mb-8 text-center">
+        <PageHeader Title="Report Incident" Subtitle="Help keep your neighborhood safe" />
+    </div>
+
+    <div class="flex items-center justify-center mb-8">
+        <div class="@GetStepIndicatorClass(1)">@GetStepIndicatorText(1)</div>
+        <div class="step-connector @(currentStep > 1 && !isSuccess ? "completed" : "")"></div>
+        <div class="@GetStepIndicatorClass(2)">@GetStepIndicatorText(2)</div>
+        <div class="step-connector @(currentStep > 2 && !isSuccess ? "completed" : "")"></div>
+        <div class="@GetStepIndicatorClass(3)">@GetStepIndicatorText(3)</div>
+        <div class="step-connector @(currentStep > 3 && !isSuccess ? "completed" : "")"></div>
+        <div class="@GetStepIndicatorClass(4)">@GetStepIndicatorText(4)</div>
+    </div>
+    <div class="flex justify-between mb-8 px-2 text-xs text-center">
+        <div class="w-20" style="color: @(currentStep == 1 || isSuccess ? "var(--primary)" : "var(--text-3)");">Type & Severity</div>
+        <div class="w-20 @(currentStep != 2 ? "text-muted" : "")" style="color: @(currentStep == 2 ? "var(--primary)" : "");">Location</div>
+        <div class="w-20 @(currentStep != 3 ? "text-muted" : "")" style="color: @(currentStep == 3 ? "var(--primary)" : "");">Details</div>
+        <div class="w-20 @(currentStep != 4 ? "text-muted" : "")" style="color: @(currentStep == 4 ? "var(--primary)" : "");">Review</div>
+    </div>
+
+    <div class="glass-elevated p-8">
+        <form @onsubmit="HandleSubmit" @onsubmit:preventDefault>
+
+            @if (currentStep == 1)
+            {
+                <div class="step-content active">
+                    <h3 class="font-display text-xl font-bold mb-6">What happened?</h3>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-3">Incident Category</label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            @foreach (var cat in categories)
+                            {
+                                <div class="category-card glass-elevated p-4 rounded-lg text-center @(selectedCategoryId == cat.CategoryId ? "selected" : "")"
+                                     @onclick="() => SelectCategory(cat.CategoryId)">
+                                    <div class="text-2xl mb-2">@GetCategoryIcon(cat.Icon)</div>
+                                    <p class="font-medium text-sm">@cat.Name</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-3">Severity Level</label>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="severity-option severity-low glass-elevated p-4 text-center rounded-lg @(selectedSeverity == 0 ? "selected" : "")" @onclick="() => SetSeverity(0)">
+                                <div class="text-2xl mb-2">🟢</div>
+                                <p class="font-medium">Low</p>
+                                <p class="text-xs text-muted">Minor issue</p>
+                            </div>
+                            <div class="severity-option severity-medium glass-elevated p-4 text-center rounded-lg @(selectedSeverity == 1 ? "selected" : "")" @onclick="() => SetSeverity(1)">
+                                <div class="text-2xl mb-2">🟡</div>
+                                <p class="font-medium">Medium</p>
+                                <p class="text-xs text-muted">Concerning</p>
+                            </div>
+                            <div class="severity-option severity-high glass-elevated p-4 text-center rounded-lg @(selectedSeverity == 2 ? "selected" : "")" @onclick="() => SetSeverity(2)">
+                                <div class="text-2xl mb-2">🟠</div>
+                                <p class="font-medium">High</p>
+                                <p class="text-xs text-muted">Serious issue</p>
+                            </div>
+                            <div class="severity-option severity-critical glass-elevated p-4 text-center rounded-lg @(selectedSeverity == 3 ? "selected" : "")" @onclick="() => SetSeverity(3)">
+                                <div class="text-2xl mb-2">🔴</div>
+                                <p class="font-medium">Critical</p>
+                                <p class="text-xs text-muted">Emergency</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Quick Title</label>
+                        <input type="text" class="w-full" @bind="incidentTitle" @bind:event="oninput" placeholder="Brief description (e.g., Suspicious person near F-7)" />
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="button" class="btn btn-primary" @onclick="() => GoToStep(2)" disabled="@(!CanGoNextFromStep1)">
+                            Next: Location →
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (currentStep == 2)
+            {
+                <div class="step-content active">
+                    <h3 class="font-display text-xl font-bold mb-6">Where did it happen?</h3>
+
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="text-sm font-medium">Click on the map to set location</label>
+                            <button type="button" class="btn btn-secondary btn-sm" @onclick="UseMyLocation">
+                                📍 Use My Location
+                            </button>
+                        </div>
+                        <div id="report-map" style="width: 100%; height: 350px; border-radius: 12px; border: 2px solid var(--glass-border); display: flex; align-items: center; justify-content: center; background: var(--glass);">
+                            <p class="text-muted">Map selection would appear here</p>
+                        </div>
+                    </div>
+
+                    <div class="map-location-info" style="display: @(selectedLat.HasValue ? "block" : "none");">
+                        <div class="flex items-start gap-3">
+                            <span class="text-xl">📍</span>
+                            <div>
+                                <p class="font-medium">Lat: @(selectedLat?.ToString("F6") ?? "-"), Lng: @(selectedLng?.ToString("F6") ?? "-")</p>
+                                <p class="text-sm text-muted">Click the map to select a location</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 mb-6">
+                        <label class="block text-sm font-medium mb-2">Location Name (Optional)</label>
+                        <input type="text" class="w-full" @bind="locationName" placeholder="e.g., Centaurus Mall, F-7 Markaz" />
+                    </div>
+
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="() => GoToStep(1)">
+                            ← Back
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="() => GoToStep(3)" disabled="@(!selectedLat.HasValue)">
+                            Next: Details →
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (currentStep == 3)
+            {
+                <div class="step-content active">
+                    <h3 class="font-display text-xl font-bold mb-6">Additional Details</h3>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Description</label>
+                        <textarea class="w-full" rows="6" @bind="incidentDescription" placeholder="Describe what happened in detail. Include any relevant information like time, people involved, vehicle descriptions, etc."></textarea>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Incident Time</label>
+                        <select class="w-full mb-3" @bind="incidentTimeOption">
+                            <option value="now">Just happened</option>
+                            <option value="recent">Within the last hour</option>
+                            <option value="today">Earlier today</option>
+                            <option value="custom">Specific time</option>
+                        </select>
+                        <div style="display: @(incidentTimeOption == "custom" ? "block" : "none");">
+                            <input type="datetime-local" class="w-full" @bind="customDateTime" />
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Add Photos (Optional)</label>
+                        <div class="photo-upload-area">
+                            <div class="text-4xl mb-3">📷</div>
+                            <p class="font-medium mb-1">Drag & drop photos here</p>
+                            <p class="text-sm text-muted mb-3">or click to browse</p>
+                            <button type="button" class="btn btn-secondary btn-sm">Browse Files</button>
+                        </div>
+                        <div id="photoPreviews" class="flex flex-wrap gap-3 mt-4"></div>
+                    </div>
+
+                    <div class="mb-6 p-4 rounded-lg" style="background: var(--info-dim); border: 1px solid var(--info);">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">ℹ️</span>
+                            <div>
+                                <p class="font-medium text-sm" style="color: var(--info);">Anonymous Reporting</p>
+                                <p class="text-xs text-muted mt-1">Your identity is protected. Only your user ID is associated with this report. Authorities will not see your phone number unless you choose to share it.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="() => GoToStep(2)">
+                            ← Back
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="() => GoToStep(4)">
+                            Next: Review →
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (currentStep == 4)
+            {
+                <div class="step-content active">
+                    <h3 class="font-display text-xl font-bold mb-6">Review & Submit</h3>
+
+                    <div class="space-y-4 mb-8">
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Incident Type</p>
+                            <p class="font-medium">@(SelectedCategory != null ? $"{GetCategoryIcon(SelectedCategory.Icon)} {SelectedCategory.Name}" : "-")</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Severity</p>
+                            <p class="font-medium">@SeverityIcons[selectedSeverity] @SeverityLabels[selectedSeverity]</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Title</p>
+                            <p class="font-medium">@(string.IsNullOrEmpty(incidentTitle) ? "-" : incidentTitle)</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Location</p>
+                            <p class="font-medium">@(selectedLat.HasValue ? $"{selectedLat.Value:F4}, {selectedLng.Value:F4}" : "-")</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Description</p>
+                            <p class="font-medium whitespace-pre-wrap">@(string.IsNullOrEmpty(incidentDescription) ? "No description provided" : incidentDescription)</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Photos</p>
+                            <p class="font-medium">No photos attached</p>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="() => GoToStep(3)">
+                            ← Back
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner"></span>
+                                <span>Submitting...</span>
+                            }
+                            else
+                            {
+                                <span>Submit Report</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (isSuccess)
+            {
+                <div class="step-content active text-center py-8">
+                    <div class="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center" style="background: var(--success-dim);">
+                        <span class="text-4xl">✅</span>
+                    </div>
+                    <h3 class="font-display text-2xl font-bold mb-3">Report Submitted!</h3>
+                    <p class="text-muted mb-6">Your incident report has been submitted successfully. Authorities have been notified.</p>
+
+                    <div class="glass-elevated p-6 max-w-sm mx-auto mb-6 text-left">
+                        <p class="text-xs text-muted mb-1">Report ID</p>
+                        <p class="font-mono font-bold text-lg" style="color: var(--primary);">@submittedIncidentId</p>
+                    </div>
+
+                    <div class="flex justify-center gap-4">
+                        <a href="/user/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+                        <a href="/user/my-incidents" class="btn btn-primary">View My Reports</a>
+                    </div>
+                </div>
+            }
+
+        </form>
+    </div>
+</div>
+
+<style>
+    .step-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .step-indicator.active {
+        background: var(--primary);
+        color: #0A0A14;
+    }
+
+    .step-indicator.completed {
+        background: var(--success-dim);
+        color: var(--success);
+    }
+
+    .step-indicator.inactive {
+        background: var(--glass);
+        color: var(--text-muted);
+    }
+
+    .step-connector {
+        flex: 1;
+        height: 2px;
+        background: var(--glass-border);
+        margin: 0 8px;
+    }
+
+    .step-connector.completed {
+        background: var(--primary);
+    }
+
+    .step-content {
+        display: none;
+    }
+
+    .step-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .category-card {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid var(--glass-border);
+    }
+
+    .category-card:hover {
+        border-color: var(--primary-dim);
+        transform: translateY(-2px);
+    }
+
+    .category-card.selected {
+        border-color: var(--primary);
+        background: var(--primary-dim);
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.15);
+    }
+
+    .severity-option {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid var(--glass-border);
+    }
+
+    .severity-option:hover {
+        transform: translateY(-2px);
+    }
+
+    .severity-option.selected {
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .severity-low.selected {
+        border-color: var(--success);
+        background: var(--success-dim);
+    }
+
+    .severity-medium.selected {
+        border-color: var(--warning);
+        background: var(--warning-dim);
+    }
+
+    .severity-high.selected {
+        border-color: var(--danger);
+        background: var(--danger-dim);
+    }
+
+    .severity-critical.selected {
+        border-color: var(--danger);
+        background: var(--danger-dim);
+        animation: pulse-danger 2s infinite;
+    }
+
+    @@keyframes pulse-danger {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.4); }
+        50% { box-shadow: 0 0 0 10px rgba(255, 59, 92, 0); }
+    }
+
+    .photo-preview {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 2px solid var(--glass-border);
+    }
+
+    .photo-upload-area {
+        border: 2px dashed var(--glass-border);
+        border-radius: 12px;
+        padding: 32px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .photo-upload-area:hover {
+        border-color: var(--primary-dim);
+        background: var(--glass);
+    }
+
+    .photo-upload-area.dragover {
+        border-color: var(--primary);
+        background: var(--primary-dim);
+    }
+
+    #report-map {
+        border-radius: 12px;
+        border: 2px solid var(--glass-border);
+    }
+
+    .map-location-info {
+        background: var(--glass);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 12px;
+    }
+</style>
+
+@code {
+    private int currentStep = 1;
+    private bool isSuccess;
+    private bool isSubmitting;
+    private Guid? selectedCategoryId;
+    private int selectedSeverity = 1;
+    private double? selectedLat;
+    private double? selectedLng;
+    private string incidentTitle = "";
+    private string locationName = "";
+    private string incidentDescription = "";
+    private string incidentTimeOption = "now";
+    private DateTime? customDateTime;
+    private string submittedIncidentId = "";
+
+    private List<CategoryDto> categories = [];
+
+    private CategoryDto? SelectedCategory => categories.Find(c => c.CategoryId == selectedCategoryId);
+
+    private bool CanGoNextFromStep1 => selectedCategoryId.HasValue && !string.IsNullOrWhiteSpace(incidentTitle);
+
+    private static readonly string[] SeverityLabels = ["Low", "Medium", "High", "Critical"];
+    private static readonly string[] SeverityIcons = ["🟢", "🟡", "🟠", "🔴"];
+
+    private static readonly List<CategoryDto> DefaultCategories =
+    [
+        new CategoryDto { CategoryId = new("00000001-0000-0000-0000-000000000001"), Name = "Theft", Icon = "bag-steal", Color = "#FF3B5C", Description = "" },
+        new CategoryDto { CategoryId = new("00000002-0000-0000-0000-000000000002"), Name = "Assault", Icon = "person-danger", Color = "#FF3B5C", Description = "" },
+        new CategoryDto { CategoryId = new("00000003-0000-0000-0000-000000000003"), Name = "Suspicious Activity", Icon = "eye", Color = "#FFB800", Description = "" },
+        new CategoryDto { CategoryId = new("00000004-0000-0000-0000-000000000004"), Name = "Accident", Icon = "car-crash", Color = "#FFB800", Description = "" },
+        new CategoryDto { CategoryId = new("00000005-0000-0000-0000-000000000005"), Name = "Fire", Icon = "flame", Color = "#FF3B5C", Description = "" },
+        new CategoryDto { CategoryId = new("00000006-0000-0000-0000-000000000006"), Name = "Medical Emergency", Icon = "heart-pulse", Color = "#FF3B5C", Description = "" },
+        new CategoryDto { CategoryId = new("00000007-0000-0000-0000-000000000007"), Name = "Vandalism", Icon = "spray-can", Color = "#FF6B35", Description = "" },
+        new CategoryDto { CategoryId = new("00000008-0000-0000-0000-000000000008"), Name = "Noise Complaint", Icon = "volume-3", Color = "#00FF88", Description = "" },
+        new CategoryDto { CategoryId = new("00000009-0000-0000-0000-000000000009"), Name = "Other", Icon = "question", Color = "#6666FF", Description = "" },
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await IncidentSvc.GetCategoriesAsync();
+        }
+        catch
+        {
+            categories = [.. DefaultCategories];
+        }
+    }
+
+    private string GetStepIndicatorClass(int step)
+    {
+        if (step < currentStep || (isSuccess && step <= 4))
+            return "step-indicator completed";
+        if (step == currentStep && !isSuccess)
+            return "step-indicator active";
+        return "step-indicator inactive";
+    }
+
+    private string GetStepIndicatorText(int step)
+    {
+        if (step < currentStep || (isSuccess && step <= 4))
+            return "✓";
+        return step.ToString();
+    }
+
+    private static string GetCategoryIcon(string? iconKey) => iconKey switch
+    {
+        "moon-stars" => "🌙",
+        "car-steal" => "🚗",
+        "warning-octagon" => "⚠️",
+        "person-question" => "👤",
+        "crosshair" => "🎯",
+        "spray-can" => "🎨",
+        "flame" => "🔥",
+        "heart-pulse" => "💓",
+        "volume-3" => "🔊",
+        "eye" => "👁️",
+        "question" => "❓",
+        "person-danger" => "⚔️",
+        "bag-steal" => "🏴‍☠️",
+        "car-taxi-front" => "🚕",
+        "car-crash" => "💥",
+        _ => "📋",
+    };
+
+    private void SelectCategory(Guid categoryId)
+    {
+        selectedCategoryId = categoryId;
+    }
+
+    private void SetSeverity(int severity)
+    {
+        selectedSeverity = severity;
+    }
+
+    private void GoToStep(int step)
+    {
+        currentStep = step;
+    }
+
+    private void UseMyLocation()
+    {
+        ToastSvc.ShowInfo("Geolocation is not available in this view. Please use the map to select a location.");
+    }
+
+    private DateTime GetIncidentDateTime()
+    {
+        return incidentTimeOption switch
+        {
+            "now" => DateTime.UtcNow,
+            "recent" => DateTime.UtcNow.AddHours(-1),
+            "today" => DateTime.UtcNow.Date,
+            "custom" when customDateTime.HasValue => customDateTime.Value.ToUniversalTime(),
+            _ => DateTime.UtcNow,
+        };
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (isSubmitting) return;
+        isSubmitting = true;
+
+        try
+        {
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authState.User);
+            var userId = user?.Id;
+
+            var dto = new CreateIncidentDto
+            {
+                CategoryId = selectedCategoryId!.Value,
+                Latitude = selectedLat!.Value,
+                Longitude = selectedLng!.Value,
+                Address = string.IsNullOrWhiteSpace(locationName) ? null : locationName,
+                Title = incidentTitle,
+                Description = incidentDescription,
+                Severity = (SeverityLevel)selectedSeverity,
+                IsAnonymous = true,
+                IncidentDateTime = GetIncidentDateTime(),
+            };
+
+            var result = await IncidentSvc.CreateIncidentAsync(dto, userId);
+
+            isSuccess = true;
+            submittedIncidentId = result.IncidentNumber;
+            currentStep = 0;
+
+            ToastSvc.ShowSuccess("Report submitted successfully!");
+        }
+        catch (Exception ex)
+        {
+            ToastSvc.ShowError(ex.Message ?? "Failed to submit report. Please try again.");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

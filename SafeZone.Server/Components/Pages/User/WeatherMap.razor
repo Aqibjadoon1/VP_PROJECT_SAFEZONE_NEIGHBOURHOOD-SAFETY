@@ -1,0 +1,540 @@
+@page "/user/weather-map"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject IHttpClientFactory HttpClientFactory
+@inject IIncidentService IncidentService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="weather-page">
+    <PageHeader Title="Weather & Heat Map" Subtitle="Environmental risk, rain, temperature, air quality, and incident layers for Islamabad.">
+        <Actions>
+            <div class="weather-header-actions">
+                <span class="weather-updated">Updated @LastUpdatedLabel</span>
+                <button class="btn btn-secondary btn-sm" @onclick="RefreshAsync" disabled="@isRefreshing">
+                    @(isRefreshing ? "Refreshing..." : "Refresh")
+                </button>
+            </div>
+        </Actions>
+    </PageHeader>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="weather-notice weather-notice-warning">
+            <strong>Weather service fallback active.</strong>
+            <span>@errorMessage</span>
+        </div>
+    }
+
+    <div class="weather-stats-grid">
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">Condition</span>
+            <strong>@conditionText</strong>
+            <small>@(usedDemoData ? "Demo data" : "Open-Meteo live")</small>
+        </div>
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">Temperature</span>
+            <strong>@TemperatureDisplay</strong>
+            <small>Feels near @FeelsLikeDisplay</small>
+        </div>
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">Humidity</span>
+            <strong>@HumidityDisplay</strong>
+            <small>Moisture level</small>
+        </div>
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">Rain</span>
+            <strong>@RainDisplay</strong>
+            <small>Last hour</small>
+        </div>
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">Wind</span>
+            <strong>@WindDisplay</strong>
+            <small>@windDir direction</small>
+        </div>
+        <div class="weather-stat-card">
+            <span class="weather-stat-kicker">UV</span>
+            <strong>@UvDisplay</strong>
+            <small>Outdoor exposure</small>
+        </div>
+    </div>
+
+    <div class="weather-layer-bar glass-elevated">
+        <span>Map Layers</span>
+        @foreach (var layer in layers)
+        {
+            <button type="button" class="@GetLayerButtonClass(layer.Key)" @onclick="() => SwitchLayerAsync(layer.Key)">
+                @layer.Value
+            </button>
+        }
+    </div>
+
+    <div class="weather-map-grid">
+        <section class="weather-map-card glass-elevated">
+            <div class="weather-map-toolbar">
+                <div>
+                    <h3>@CurrentLayerTitle</h3>
+                    <p>@CurrentLayerDescription</p>
+                </div>
+                <span class="badge badge-info">@mapIncidents.Count active map points</span>
+            </div>
+
+            <div class="weather-map-frame">
+                <div id="@MapId" class="weather-map-canvas"></div>
+                @if (isLoading)
+                {
+                    <div class="weather-map-overlay">
+                        <div class="spinner"></div>
+                        <p>Loading weather layers...</p>
+                    </div>
+                }
+                else if (!isMapReady)
+                {
+                    <div class="weather-map-overlay">
+                        <p>Preparing interactive map...</p>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <aside class="weather-side-stack">
+            <div class="weather-panel glass-elevated">
+                <h4>Layer Legend</h4>
+                <div class="weather-legend-card">
+                    <div class="weather-legend-gradient @CurrentLegendClass"></div>
+                    <div class="weather-legend-labels">
+                        <span>@LegendLow</span>
+                        <span>@LegendHigh</span>
+                    </div>
+                    <p>@CurrentLayerDescription</p>
+                </div>
+            </div>
+
+            <div class="weather-panel glass-elevated">
+                <h4>Weather Alerts</h4>
+                <div class="weather-alert-list">
+                    @foreach (var alert in alerts)
+                    {
+                        <div class="weather-alert-card @($"weather-alert-{alert.Type}")">
+                            <strong>@alert.Title</strong>
+                            <span>@alert.Message</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="weather-panel glass-elevated">
+                <h4>Location Details</h4>
+                <div class="weather-detail-list">
+                    <div><span>Latitude</span><strong>@currentLat.ToString("F4")</strong></div>
+                    <div><span>Longitude</span><strong>@currentLng.ToString("F4")</strong></div>
+                    <div><span>Pressure</span><strong>@PressureDisplay</strong></div>
+                    <div><span>Source</span><strong>@(usedDemoData ? "Demo fallback" : "Open-Meteo")</strong></div>
+                </div>
+            </div>
+
+            @if (mapIncidents.Count == 0)
+            {
+                <div class="weather-panel glass-elevated">
+                    <EmptyState Icon="MAP" Title="No incident markers" Message="The environmental layer is still available with demo heat points." />
+                </div>
+            }
+        </aside>
+    </div>
+</div>
+
+@code {
+    private const string MapId = "weather-heat-map";
+    private readonly double currentLat = 33.6844;
+    private readonly double currentLng = 73.0479;
+
+    private bool isLoading = true;
+    private bool isRefreshing;
+    private bool isMapReady;
+    private bool usedDemoData;
+    private string? errorMessage;
+    private string currentLayer = "rainfall";
+    private DateTime? lastUpdated;
+
+    private double temp = 32;
+    private double apparentTemp = 34;
+    private double humidity = 65;
+    private double rain = 1.4;
+    private double wind = 18;
+    private double pressure = 1014;
+    private double uvIndex = 5.5;
+    private double windDirectionDeg = 315;
+    private int weatherCode;
+    private string windDir = "NW";
+    private string conditionText = "Clear sky";
+
+    private List<MapIncidentDto> mapIncidents = [];
+    private List<AlertItem> alerts = [];
+
+    private readonly Dictionary<string, string> layers = new()
+    {
+        ["rainfall"] = "Rainfall",
+        ["temperature"] = "Temperature",
+        ["pollution"] = "Air Quality",
+        ["incidents"] = "Incidents",
+        ["all"] = "Combined"
+    };
+
+    private readonly Dictionary<int, string> weatherCodes = new()
+    {
+        [0] = "Clear sky",
+        [1] = "Mainly clear",
+        [2] = "Partly cloudy",
+        [3] = "Overcast",
+        [45] = "Fog",
+        [48] = "Rime fog",
+        [51] = "Light drizzle",
+        [53] = "Moderate drizzle",
+        [55] = "Dense drizzle",
+        [61] = "Slight rain",
+        [63] = "Moderate rain",
+        [65] = "Heavy rain",
+        [80] = "Rain showers",
+        [81] = "Slight showers",
+        [82] = "Moderate showers",
+        [95] = "Thunderstorm",
+        [96] = "Storm with hail",
+        [99] = "Heavy hail storm"
+    };
+
+    private readonly string[] windDirections = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+    private string TemperatureDisplay => $"{temp:F1} C";
+    private string FeelsLikeDisplay => $"{apparentTemp:F1} C";
+    private string HumidityDisplay => $"{humidity:F0}%";
+    private string RainDisplay => $"{rain:F1} mm";
+    private string WindDisplay => $"{wind:F0} km/h";
+    private string UvDisplay => $"{uvIndex:F1}";
+    private string PressureDisplay => $"{pressure:F0} hPa";
+    private string LastUpdatedLabel => lastUpdated?.ToString("hh:mm tt") ?? "pending";
+
+    private string CurrentLayerTitle => currentLayer switch
+    {
+        "rainfall" => "Rainfall Intensity Heat Map",
+        "temperature" => "Temperature Heat Map",
+        "pollution" => "Air Quality Risk Map",
+        "incidents" => "Incident Marker Map",
+        "all" => "Combined Weather & Incident Map",
+        _ => "Weather Map"
+    };
+
+    private string CurrentLayerDescription => currentLayer switch
+    {
+        "rainfall" => "Rain intensity uses live precipitation data with surrounding demo cells when the API has sparse coverage.",
+        "temperature" => "Heat cells show temperature variation around the city center.",
+        "pollution" => "Air quality risk is estimated from humidity, wind, and rain conditions for a graceful no-key fallback.",
+        "incidents" => "Reported incident markers are plotted from SafeZone incident data.",
+        "all" => "Weather heat data and incident markers are shown together.",
+        _ => "Live environmental layer"
+    };
+
+    private string CurrentLegendClass => currentLayer switch
+    {
+        "temperature" => "temperature-gradient",
+        "pollution" => "pollution-gradient",
+        "incidents" => "incident-gradient",
+        "all" => "combined-gradient",
+        _ => "rainfall-gradient"
+    };
+
+    private string LegendLow => currentLayer switch
+    {
+        "temperature" => "Cool",
+        "pollution" => "Clean",
+        "incidents" => "Low",
+        _ => "Light"
+    };
+
+    private string LegendHigh => currentLayer switch
+    {
+        "temperature" => "Hot",
+        "pollution" => "High risk",
+        "incidents" => "Critical",
+        _ => "Heavy"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isMapReady = true;
+            await RenderMapAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        await Task.WhenAll(LoadWeatherAsync(), LoadIncidentsAsync());
+        UpdateAlerts();
+        isLoading = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        isRefreshing = true;
+        await LoadAsync();
+        isRefreshing = false;
+        await RenderMapAsync();
+    }
+
+    private async Task SwitchLayerAsync(string layer)
+    {
+        currentLayer = layer;
+        await RenderMapAsync();
+    }
+
+    private string GetLayerButtonClass(string layer)
+    {
+        return currentLayer == layer
+            ? "weather-layer-button is-active"
+            : "weather-layer-button";
+    }
+
+    private async Task LoadWeatherAsync()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(8);
+            var url = $"https://api.open-meteo.com/v1/forecast?latitude={currentLat}&longitude={currentLng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,uv_index&timezone=auto";
+            using var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var current = doc.RootElement.GetProperty("current");
+
+            temp = current.GetProperty("temperature_2m").GetDouble();
+            apparentTemp = current.GetProperty("apparent_temperature").GetDouble();
+            humidity = current.GetProperty("relative_humidity_2m").GetDouble();
+            rain = current.TryGetProperty("rain", out var rainEl) ? rainEl.GetDouble() : 0;
+            wind = current.GetProperty("wind_speed_10m").GetDouble();
+            pressure = current.GetProperty("surface_pressure").GetDouble();
+            weatherCode = current.GetProperty("weather_code").GetInt32();
+            windDirectionDeg = current.GetProperty("wind_direction_10m").GetDouble();
+            uvIndex = current.TryGetProperty("uv_index", out var uvEl) ? uvEl.GetDouble() : 5;
+            usedDemoData = false;
+        }
+        catch
+        {
+            usedDemoData = true;
+            errorMessage = "Live weather API was unavailable, so SafeZone is showing styled demo weather data instead of a broken map.";
+            temp = 32.8;
+            apparentTemp = 35.1;
+            humidity = 67;
+            rain = 2.2;
+            wind = 16;
+            pressure = 1012;
+            weatherCode = 1;
+            windDirectionDeg = 315;
+            uvIndex = 5.7;
+        }
+
+        conditionText = weatherCodes.GetValueOrDefault(weatherCode, "Clear sky");
+        windDir = windDirections[((int)Math.Round(windDirectionDeg / 45)) % 8];
+        lastUpdated = DateTime.Now;
+    }
+
+    private async Task LoadIncidentsAsync()
+    {
+        try
+        {
+            mapIncidents = await IncidentService.GetIncidentsForMapAsync();
+        }
+        catch
+        {
+            mapIncidents = [];
+        }
+    }
+
+    private async Task RenderMapAsync()
+    {
+        if (!isMapReady)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("safezoneMap.init", MapId, new
+            {
+                center = new { lat = currentLat, lng = currentLng },
+                zoom = 12,
+                zoomControl = true,
+                scrollWheelZoom = true
+            });
+
+            await JS.InvokeVoidAsync("safezoneMap.removeHeatmap", MapId);
+            await JS.InvokeVoidAsync("safezoneMap.clearMarkers", MapId);
+
+            if (currentLayer is not "incidents")
+            {
+                await JS.InvokeVoidAsync("safezoneMap.addHeatmap", MapId, BuildHeatPoints(), new
+                {
+                    radius = 25,
+                    blur = 15,
+                    maxZoom = 12,
+                    gradient = GetGradient()
+                });
+            }
+
+            if (currentLayer is "incidents" or "all")
+            {
+                await JS.InvokeVoidAsync("safezoneMap.addIncidentMarkers", MapId, mapIncidents);
+                if (mapIncidents.Count > 0)
+                {
+                    await JS.InvokeVoidAsync("safezoneMap.fitBounds", MapId, mapIncidents);
+                }
+            }
+
+            await JS.InvokeVoidAsync("safezoneMap.invalidate", MapId);
+        }
+        catch
+        {
+            errorMessage = "Interactive map scripts could not initialize. Check Leaflet script loading in _Host.cshtml.";
+        }
+    }
+
+    private List<WeatherHeatPoint> BuildHeatPoints()
+    {
+        if (currentLayer == "incidents")
+        {
+            return mapIncidents
+                .Select(i => new WeatherHeatPoint(i.Lat, i.Lng, i.Severity switch
+                {
+                    SeverityLevel.Critical => 1.0,
+                    SeverityLevel.High => 0.78,
+                    SeverityLevel.Medium => 0.55,
+                    _ => 0.35
+                }))
+                .ToList();
+        }
+
+        var points = new List<WeatherHeatPoint>();
+        for (var x = -4; x <= 4; x++)
+        {
+            for (var y = -4; y <= 4; y++)
+            {
+                // Spatial variation: center is hotter, edges are cooler
+                var distanceFromCenter = Math.Sqrt(x * x + y * y) / 5.66; // max distance ~5.66
+                var centerBoost = 1.0 - (distanceFromCenter * 0.3); // center gets 1.0, edges get ~0.7
+                
+                var intensity = currentLayer switch
+                {
+                    // Temperature: direct mapping with spatial variation
+                    // < 20°C = blue/cool, 20-30°C = green/yellow, > 30°C = orange/red
+                    "temperature" => temp switch
+                    {
+                        >= 35 => 0.95 * centerBoost,
+                        >= 30 => 0.75 * centerBoost,
+                        >= 25 => 0.55 * centerBoost,
+                        >= 20 => 0.35 * centerBoost,
+                        _ => 0.2 * centerBoost
+                    },
+                    // Pollution
+                    "pollution" => Math.Clamp((humidity / 100) * 0.5 + Math.Max(0, 24 - wind) / 24 * 0.5, 0.1, 1) * centerBoost,
+                    // Combined
+                    "all" => Math.Clamp((rain / 20) * 0.4 + ((temp - 15) / 25) * 0.4 + 0.2, 0.1, 1) * centerBoost,
+                    // Rainfall (default)
+                    _ => Math.Clamp((rain / 15) * 0.8 + 0.1, 0.1, 1) * centerBoost
+                };
+
+                points.Add(new WeatherHeatPoint(
+                    currentLat + x * 0.012,
+                    currentLng + y * 0.012,
+                    Math.Round(intensity, 2)));
+            }
+        }
+
+        return points;
+    }
+
+    private Dictionary<string, string> GetGradient()
+    {
+        return currentLayer switch
+        {
+            "temperature" => new Dictionary<string, string>
+            {
+                ["0.1"] = "#3B82F6",   // blue - cool
+                ["0.3"] = "#00FF88",   // green - mild  
+                ["0.5"] = "#FFB800",   // yellow - warm
+                ["0.7"] = "#FF9500",   // orange - hot
+                ["0.9"] = "#FF3B5C"    // red - very hot
+            },
+            "pollution" => new Dictionary<string, string>
+            {
+                ["0.1"] = "#00FF88",
+                ["0.4"] = "#FFB800",
+                ["0.7"] = "#FF9500",
+                ["0.9"] = "#FF3B5C"
+            },
+            "all" => new Dictionary<string, string>
+            {
+                ["0.1"] = "#3B82F6",
+                ["0.4"] = "#A855F7",
+                ["0.7"] = "#FF9500",
+                ["0.9"] = "#FF3B5C"
+            },
+            _ => new Dictionary<string, string>
+            {
+                ["0.1"] = "#3B82F6",
+                ["0.4"] = "#00FF88",
+                ["0.7"] = "#FF9500",
+                ["0.9"] = "#FF3B5C"
+            }
+        };
+    }
+
+    private void UpdateAlerts()
+    {
+        alerts = [];
+
+        if (weatherCode >= 95)
+        {
+            alerts.Add(new("danger", "Thunderstorm Warning", "Thunderstorm risk detected. Move indoors and avoid exposed routes."));
+        }
+
+        if (rain >= 10)
+        {
+            alerts.Add(new("info", "Heavy Rain Advisory", $"{rain:F1} mm rain detected. Road visibility may be reduced."));
+        }
+
+        if (temp >= 38)
+        {
+            alerts.Add(new("warning", "Heat Advisory", $"Temperature is {temp:F1} C. Stay hydrated and avoid long outdoor exposure."));
+        }
+
+        if (alerts.Count == 0)
+        {
+            alerts.Add(new("success", "No Active Weather Alerts", "Conditions look stable for the monitored area."));
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("safezoneMap.dispose", MapId);
+        }
+        catch
+        {
+            // The circuit may already be gone during navigation.
+        }
+    }
+
+    private sealed record AlertItem(string Type, string Title, string Message);
+    private sealed record WeatherHeatPoint(double Lat, double Lng, double Intensity);
+}

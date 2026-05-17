@@ -1,0 +1,531 @@
+@page "/authority/fir-management"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject IFirService FirService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+
+<div class="ambient-glow-2"></div>
+<div class="pb-8 px-4 max-w-7xl mx-auto">
+    <PageHeader Title="FIR Management" Subtitle="Review and manage First Information Reports" />
+
+    @if (isLoading)
+    {
+        <div style="margin-bottom: 32px;">
+            <LoadingSkeleton Type="stats" />
+        </div>
+        <LoadingSkeleton Type="page" />
+    }
+    else
+    {
+        <div class="stats-row">
+            <MetricCard Label="Submitted" Value="@SubmittedCount.ToString()" Accent="warning" />
+            <MetricCard Label="Under Review" Value="@UnderReviewCount.ToString()" Accent="primary" />
+            <MetricCard Label="Accepted" Value="@AcceptedCount.ToString()" Accent="success" />
+            <MetricCard Label="Rejected" Value="@RejectedCount.ToString()" Accent="danger" />
+            <MetricCard Label="Investigating" Value="@InvestigatingCount.ToString()" Accent="purple" />
+            <MetricCard Label="Closed" Value="@ClosedCount.ToString()" Accent="secondary" />
+        </div>
+
+        <GlassCard Class="rounded-xl overflow-hidden mb-8">
+            <div class="p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between" style="border-bottom: 1px solid var(--glass-border);">
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-sm @(statusFilter == "all" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "all"'>All</button>
+                    <button class="btn btn-sm @(statusFilter == "Submitted" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "Submitted"'>Submitted</button>
+                    <button class="btn btn-sm @(statusFilter == "UnderReview" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "UnderReview"'>Under Review</button>
+                    <button class="btn btn-sm @(statusFilter == "Accepted" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "Accepted"'>Accepted</button>
+                    <button class="btn btn-sm @(statusFilter == "Rejected" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "Rejected"'>Rejected</button>
+                    <button class="btn btn-sm @(statusFilter == "Investigating" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "Investigating"'>Investigating</button>
+                    <button class="btn btn-sm @(statusFilter == "Closed" ? "btn-primary" : "btn-secondary")" @onclick='() => statusFilter = "Closed"'>Closed</button>
+                </div>
+                <div class="w-full md:w-72">
+                    <input type="text" class="w-full px-4 py-2 rounded-lg" style="background: var(--glass); border: 1px solid var(--glass-border); color: inherit;" placeholder="Search FIR# or complainant..." @bind='searchQuery' @bind:event='oninput' />
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                @if (FilteredFirs.Count == 0)
+                {
+                    <EmptyState Icon="📋" Title="No FIRs Found" Message="@(string.IsNullOrWhiteSpace(searchQuery) ? "No FIR reports have been submitted yet." : "No FIRs match your search criteria.")" />
+                }
+                else
+                {
+                    <table class="w-full">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--glass-border); background: var(--glass);">
+                                <th class="text-left p-4 font-medium text-sm text-muted">FIR#</th>
+                                <th class="text-left p-4 font-medium text-sm text-muted">Complainant</th>
+                                <th class="text-left p-4 font-medium text-sm text-muted">Status</th>
+                                <th class="text-left p-4 font-medium text-sm text-muted">Submitted</th>
+                                <th class="text-left p-4 font-medium text-sm text-muted">Reviewed By</th>
+                                <th class="text-left p-4 font-medium text-sm text-muted">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var fir in FilteredFirs)
+                            {
+                                <tr style="border-bottom: 1px solid var(--glass-border);" class="hover:bg-white/[0.02] transition-colors cursor-pointer" @onclick='() => OpenDetail(fir)'>
+                                    <td class="p-4">
+                                        <span class="font-mono font-medium" style="color: var(--primary);">@fir.FirNumber</span>
+                                    </td>
+                                    <td class="p-4">
+                                        <div class="font-medium">@fir.ComplainantName</div>
+                                    </td>
+                                    <td class="p-4">
+                                        <span class="badge badge-@GetStatusBadge(fir.Status)">@GetStatusLabel(fir.Status)</span>
+                                    </td>
+                                    <td class="p-4">
+                                        <div class="text-sm">@FormatDate(fir.SubmittedAt)</div>
+                                    </td>
+                                    <td class="p-4">
+                                        @if (!string.IsNullOrEmpty(fir.ReviewedByName))
+                                        {
+                                            <span>@fir.ReviewedByName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Pending</span>
+                                        }
+                                    </td>
+                                    <td class="p-4" @onclick:stopPropagation>
+                                        @if (fir.Status == FIRStatus.Submitted || fir.Status == FIRStatus.UnderReview)
+                                        {
+                                            <button class="btn btn-primary btn-sm" @onclick='() => OpenReview(fir)'>Review</button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted text-sm">--</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </GlassCard>
+
+        <div class="flex justify-between items-center">
+            <p class="text-sm text-muted">Showing @FilteredFirs.Count of @allFirs.Count FIRs</p>
+            <button class="btn btn-secondary btn-sm" @onclick='GoToDashboard'>Back to Dashboard</button>
+        </div>
+    }
+</div>
+
+@if (showDetailModal && selectedFir is not null)
+{
+    <div class="modal-overlay active" @onclick='CloseDetail'>
+        <div class="modal-content modal-lg" @onclick:stopPropagation>
+            <div class="flex justify-between items-center p-6" style="border-bottom: 1px solid var(--glass-border);">
+                <div>
+                    <h3 class="font-display text-xl font-bold">@selectedFir.FirNumber</h3>
+                    <p class="text-sm text-muted">Submitted on @FormatDate(selectedFir.SubmittedAt)</p>
+                </div>
+                <button class="btn btn-secondary btn-sm w-10 h-10 p-0 flex items-center justify-center" @onclick='CloseDetail'>✕</button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6 flex items-center gap-3">
+                    <span class="badge badge-@GetStatusBadge(selectedFir.Status)">@GetStatusLabel(selectedFir.Status)</span>
+                    @if (selectedFir.Status == FIRStatus.Rejected && selectedFirDetail?.RejectionReason is not null)
+                    {
+                        <span class="text-sm" style="color: var(--danger);">@selectedFirDetail.RejectionReason</span>
+                    }
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-2 uppercase tracking-wide">Complainant Information</p>
+                        <div class="space-y-2">
+                            <div>
+                                <p class="text-xs text-muted">Name</p>
+                                <p class="font-medium">@selectedFir.ComplainantName</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">CNIC</p>
+                                <p class="font-mono text-sm">@(selectedFirDetail?.ComplainantCNIC ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Phone</p>
+                                <p class="text-sm">@(selectedFirDetail?.ComplainantPhone ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Address</p>
+                                <p class="text-sm">@(selectedFirDetail?.ComplainantAddress ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Father Name</p>
+                                <p class="text-sm">@(selectedFirDetail?.ComplainantFatherName ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Date of Birth</p>
+                                <p class="text-sm">@(selectedFirDetail?.ComplainantDateOfBirth?.ToString("MMM dd, yyyy") ?? "N/A")</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-2 uppercase tracking-wide">Incident Details</p>
+                        <div class="space-y-2">
+                            <div>
+                                <p class="text-xs text-muted">Title</p>
+                                <p class="font-medium">@(selectedFirDetail?.IncidentTitle ?? "Standalone FIR")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Date & Time</p>
+                                <p class="text-sm">@(selectedFirDetail?.IncidentDateTime is not null ? FormatDate(selectedFirDetail.IncidentDateTime) : "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Place</p>
+                                <p class="text-sm">@(selectedFirDetail?.IncidentPlace ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Coordinates</p>
+                                <p class="font-mono text-sm">@(selectedFirDetail is not null ? $"{selectedFirDetail.IncidentLatitude:F4}, {selectedFirDetail.IncidentLongitude:F4}" : "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Property Lost</p>
+                                <p class="text-sm">@(selectedFirDetail?.PropertyLost ?? "None")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Estimated Loss</p>
+                                <p class="text-sm">@(selectedFirDetail?.EstimatedLoss > 0 ? $"PKR {selectedFirDetail.EstimatedLoss:N0}" : "N/A")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-xs text-muted mb-2 uppercase tracking-wide">Incident Narrative</p>
+                    <div class="p-4 rounded-lg max-h-40 overflow-y-auto" style="background: var(--glass);">
+                        <p class="whitespace-pre-wrap text-sm">@(selectedFirDetail?.IncidentNarrative ?? "N/A")</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-2 uppercase tracking-wide">Accused Info</p>
+                        <div class="space-y-2">
+                            <div>
+                                <p class="text-xs text-muted">Known</p>
+                                <p class="text-sm">@(selectedFirDetail?.AccusedKnown == true ? "Yes" : "No")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Count</p>
+                                <p class="text-sm">@(selectedFirDetail?.NumberOfAccused ?? 0)</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Name</p>
+                                <p class="text-sm">@(selectedFirDetail?.AccusedName ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">CNIC</p>
+                                <p class="font-mono text-sm">@(selectedFirDetail?.AccusedCNIC ?? "N/A")</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-muted">Address</p>
+                                <p class="text-sm">@(selectedFirDetail?.AccusedAddress ?? "N/A")</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-2 uppercase tracking-wide">Witness Details</p>
+                        <p class="text-sm">@(selectedFirDetail?.WitnessDetails ?? "None provided")</p>
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-2 uppercase tracking-wide">Status Timeline</p>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-xs text-muted">Submitted</p>
+                                <p class="text-sm">@FormatDate(selectedFir.SubmittedAt)</p>
+                            </div>
+                            @if (selectedFir.ReviewedAt.HasValue)
+                            {
+                                <div>
+                                    <p class="text-xs text-muted">Reviewed</p>
+                                    <p class="text-sm">@FormatDate(selectedFir.ReviewedAt.Value)</p>
+                                </div>
+                            }
+                            <div>
+                                <p class="text-xs text-muted">Current Status</p>
+                                <span class="badge badge-@GetStatusBadge(selectedFir.Status) mt-1">@GetStatusLabel(selectedFir.Status)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <p class="text-xs text-muted mb-1">Reporter</p>
+                            <p class="font-medium text-sm">@(selectedFirDetail?.ReporterName ?? "Unknown")</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted mb-1">Reviewed By</p>
+                            <p class="font-medium text-sm">@(selectedFir.ReviewedByName ?? "Pending")</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted mb-1">Declaration</p>
+                            <p class="font-medium text-sm">@(selectedFirDetail?.DeclarationAccepted == true ? "Accepted" : "N/A")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showReviewModal && selectedFir is not null)
+{
+    <div class="modal-overlay active" @onclick='CloseReview'>
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="flex justify-between items-center p-6" style="border-bottom: 1px solid var(--glass-border);">
+                <div>
+                    <h3 class="font-display text-xl font-bold">Review FIR</h3>
+                    <p class="text-sm text-muted">@selectedFir.FirNumber - @selectedFir.ComplainantName</p>
+                </div>
+                <button class="btn btn-secondary btn-sm w-10 h-10 p-0 flex items-center justify-center" @onclick='CloseReview'>✕</button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <p class="text-xs text-muted mb-2 uppercase tracking-wide">Incident Narrative</p>
+                    <div class="p-4 rounded-lg max-h-32 overflow-y-auto" style="background: var(--glass);">
+                        <p class="whitespace-pre-wrap text-sm">@(selectedFirDetail?.IncidentNarrative ?? "Loading...")</p>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-xs text-muted mb-3 uppercase tracking-wide">Review Action</p>
+                    <div class="flex gap-3 mb-4">
+                        <button class="btn flex-1 @(reviewAction == FIRStatus.Accepted ? "btn-primary" : "btn-secondary")" @onclick='() => reviewAction = FIRStatus.Accepted'>
+                            ✅ Accept FIR
+                        </button>
+                        <button class="btn flex-1 @(reviewAction == FIRStatus.Rejected ? "btn-danger" : "btn-secondary")" @onclick='() => reviewAction = FIRStatus.Rejected'>
+                            ❌ Reject FIR
+                        </button>
+                    </div>
+
+                    @if (reviewAction == FIRStatus.Rejected)
+                    {
+                        <div>
+                            <label class="text-sm font-medium mb-2 block">Rejection Reason <span style="color: var(--danger);">*</span></label>
+                            <textarea class="w-full px-4 py-3 rounded-lg" style="background: var(--glass); border: 1px solid var(--glass-border); color: inherit; min-height: 100px;" placeholder="Provide a reason for rejection (required)..." maxlength="500" @bind='rejectionReason'></textarea>
+                            <div class="flex justify-between items-center mt-1">
+                                @if (string.IsNullOrWhiteSpace(rejectionReason))
+                                {
+                                    <span class="text-xs" style="color: var(--danger);">Rejection reason is required</span>
+                                }
+                                else
+                                {
+                                    <span></span>
+                                }
+                                <span class="text-xs text-muted">@rejectionReason.Length / 500</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4" style="border-top: 1px solid var(--glass-border);">
+                    <button class="btn btn-secondary" @onclick='CloseReview'>Cancel</button>
+                    <button class="btn btn-primary" @onclick='SubmitReview' disabled="@(isSubmitting || !reviewAction.HasValue || (reviewAction == FIRStatus.Rejected && string.IsNullOrWhiteSpace(rejectionReason)))">
+                        @if (isSubmitting)
+                        {
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <span>Submit Review</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 20px;
+        animation: fadeIn 0.2s ease;
+    }
+    .modal-content {
+        background: var(--glass-elevated);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 580px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-content.modal-lg {
+        max-width: 800px;
+    }
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .badge-warning {
+        background: rgba(102, 102, 255, 0.15);
+        color: #6666FF;
+    }
+    .badge-primary {
+        background: rgba(255, 184, 0, 0.15);
+        color: #FFB800;
+    }
+    .badge-success {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00FF88;
+    }
+    .badge-danger {
+        background: rgba(255, 59, 92, 0.15);
+        color: #FF3B5C;
+    }
+    .badge-purple {
+        background: rgba(168, 85, 247, 0.15);
+        color: #A855F7;
+    }
+    .badge-secondary {
+        background: rgba(100, 116, 139, 0.15);
+        color: #64748B;
+    }
+    .btn-danger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 20px;
+        border-radius: 10px;
+        font-weight: 500;
+        font-size: 14px;
+        border: 1px solid var(--danger);
+        background: var(--danger-dim);
+        color: var(--danger);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-danger:hover {
+        background: var(--danger);
+        color: #fff;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>
+
+@code {
+    private string statusFilter = "all";
+    private string searchQuery = "";
+    private List<FirListDto> allFirs = [];
+    private FirListDto? selectedFir;
+    private FirResponseDto? selectedFirDetail;
+    private bool showDetailModal;
+    private bool showReviewModal;
+    private FIRStatus? reviewAction;
+    private string rejectionReason = "";
+    private bool isSubmitting;
+    private bool isLoading = true;
+
+    private int SubmittedCount, UnderReviewCount, AcceptedCount, RejectedCount, InvestigatingCount, ClosedCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allFirs = await FirService.GetAllFirsAsync();
+            SubmittedCount = allFirs.Count(f => f.Status == FIRStatus.Submitted);
+            UnderReviewCount = allFirs.Count(f => f.Status == FIRStatus.UnderReview);
+            AcceptedCount = allFirs.Count(f => f.Status == FIRStatus.Accepted);
+            RejectedCount = allFirs.Count(f => f.Status == FIRStatus.Rejected);
+            InvestigatingCount = allFirs.Count(f => f.Status == FIRStatus.Investigating);
+            ClosedCount = allFirs.Count(f => f.Status == FIRStatus.Closed);
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private List<FirListDto> FilteredFirs
+    {
+        get
+        {
+            var q = allFirs.AsEnumerable();
+            if (statusFilter != "all" && Enum.TryParse<FIRStatus>(statusFilter, true, out var s))
+                q = q.Where(f => f.Status == s);
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+                q = q.Where(f => f.FirNumber.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || f.ComplainantName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+            return q.OrderByDescending(f => f.SubmittedAt).ToList();
+        }
+    }
+
+    private string GetStatusBadge(FIRStatus s) => s switch
+    {
+        FIRStatus.Submitted => "warning",
+        FIRStatus.UnderReview => "primary",
+        FIRStatus.Accepted => "success",
+        FIRStatus.Rejected => "danger",
+        FIRStatus.Investigating => "purple",
+        FIRStatus.Closed => "secondary",
+        _ => "secondary"
+    };
+
+    private static string GetStatusLabel(FIRStatus status) => status switch
+    {
+        FIRStatus.Submitted => "Submitted",
+        FIRStatus.UnderReview => "Under Review",
+        FIRStatus.Accepted => "Accepted",
+        FIRStatus.Rejected => "Rejected",
+        FIRStatus.Investigating => "Investigating",
+        FIRStatus.Closed => "Closed",
+        _ => status.ToString()
+    };
+
+    private async Task OpenDetail(FirListDto fir)
+    {
+        selectedFir = fir;
+        try { selectedFirDetail = await FirService.GetFirByIdAsync(fir.FirId); }
+        catch { selectedFirDetail = null; }
+        showDetailModal = true;
+    }
+    private void CloseDetail() { showDetailModal = false; selectedFir = null; selectedFirDetail = null; }
+
+    private void OpenReview(FirListDto fir)
+    {
+        selectedFir = fir;
+        reviewAction = null;
+        rejectionReason = "";
+        showReviewModal = true;
+        showDetailModal = false;
+    }
+    private void CloseReview() { showReviewModal = false; selectedFir = null; reviewAction = null; }
+
+    private async Task SubmitReview()
+    {
+        if (selectedFir == null || !reviewAction.HasValue) return;
+        if (reviewAction == FIRStatus.Rejected && string.IsNullOrWhiteSpace(rejectionReason)) return;
+        isSubmitting = true;
+        try
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? userId = userIdClaim is not null && Guid.TryParse(userIdClaim, out var uid) ? uid : null;
+            await FirService.ReviewFirAsync(selectedFir.FirId, reviewAction.Value, rejectionReason, userId!.Value);
+            allFirs = await FirService.GetAllFirsAsync();
+            CloseReview();
+        }
+        catch { }
+        finally { isSubmitting = false; }
+    }
+
+    private string FormatDate(DateTime dt) => dt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt");
+    private void GoToDashboard() => Navigation.NavigateTo("/authority/board");
+}

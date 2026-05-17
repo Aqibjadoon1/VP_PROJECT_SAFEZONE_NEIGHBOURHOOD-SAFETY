@@ -1,0 +1,11 @@
+bin/
+obj/
+*.db
+*.exe
+*.dll
+*.pdb
+*.user
+.vs/
+.superpowers/
+node_modules/
+*.cache

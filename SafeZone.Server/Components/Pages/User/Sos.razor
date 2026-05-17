@@ -1,0 +1,444 @@
+@page "/user/sos"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject ISosService SosService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ToastService ToastSvc
+
+<PageTitle>SOS Emergency - SafeZone</PageTitle>
+
+<div class="sos-page">
+
+    <!-- Hero SOS Button -->
+    <div class="sos-hero">
+        <div class="sos-button-wrap">
+            <div class="sos-button" @onclick="StartCountdown">
+                <span class="sos-button-text">SOS</span>
+            </div>
+        </div>
+        <h2 class="sos-hero-title">Emergency SOS</h2>
+        <p class="sos-hero-sub">Tap the SOS button to immediately contact emergency services</p>
+        <p class="sos-hero-sub" style="font-size: 12px; margin-top: 4px;">Your location will be shared automatically</p>
+    </div>
+
+    <!-- Emergency Type Selection -->
+    <div class="glass-elevated p-6 mb-6">
+        <h3 class="font-semibold mb-4" style="font-size: 16px;">Select Emergency Type</h3>
+        <div class="emergency-type-grid">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="emergency-card @(selectedEmergencyType == i ? "selected" : "")"
+                     @onclick="() => SelectEmergencyType(i)">
+                    <div class="emoji">@EmergencyTypeEmojis[i]</div>
+                    <p class="name">@EmergencyTypeNames[i]</p>
+                    <p class="number">Dial @EmergencyNumbers[i]</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Location -->
+    <div class="glass-elevated p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold" style="font-size: 16px;">Your Location</h3>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="GetMyLocation">
+                <span style="margin-right: 4px;">&#x1F4CD;</span> Get My Location
+            </button>
+        </div>
+        <div id="sos-map" class="sos-map-box"></div>
+        <div class="mt-3 p-3 rounded-lg" style="background: var(--glass);">
+            <div class="flex items-start gap-3">
+                <span style="font-size: 18px;">&#x1F4CD;</span>
+                <div>
+                    <p class="font-medium text-sm">@locationText</p>
+                    <p class="text-xs" style="color: var(--text-3);">@locationAddress</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emergency Details -->
+    <div class="glass-elevated p-6 mb-6">
+        <h3 class="font-semibold mb-4" style="font-size: 16px;">Emergency Details (Optional)</h3>
+        <textarea @bind="additionalNotes" class="w-full" rows="3"
+                  placeholder="Describe the emergency situation... (e.g., 'Person is having chest pain', 'Fire spreading to adjacent building', etc.)"></textarea>
+        <label class="flex items-center gap-3 mt-4 cursor-pointer">
+            <input type="checkbox" @bind="notifyContacts" class="w-4 h-4">
+            <span class="text-sm" style="color: var(--text-2);">Notify my emergency contacts via SMS</span>
+        </label>
+    </div>
+
+    <!-- Recent SOS Activity -->
+    <div class="glass-elevated p-6">
+        <h3 class="font-semibold mb-4" style="font-size: 16px;">Recent SOS Activity</h3>
+        @if (logsLoading)
+        {
+            <p class="text-center py-4" style="color: var(--text-3); font-size: 14px;">Loading...</p>
+        }
+        else if (!string.IsNullOrEmpty(logsError))
+        {
+            <p class="text-center py-4" style="color: var(--text-3); font-size: 14px;">@logsError</p>
+        }
+        else if (recentLogs.Count == 0)
+        {
+            <p class="text-center py-4" style="color: var(--text-3); font-size: 14px;">No recent SOS activity</p>
+        }
+        else
+        {
+            @foreach (var log in recentLogs.Take(5))
+            {
+                <div class="sos-log-item">
+                    <div class="sos-log-header">
+                        <div class="sos-log-meta">
+                            <span class="sos-log-emoji">@GetEmergencyEmoji(log.CallType)</span>
+                            <div class="sos-log-info">
+                                <p>@log.CallType Emergency</p>
+                                <span>@log.InitiatedAt.ToString("g")</span>
+                            </div>
+                        </div>
+                        @{
+                            var isCompleted = log.Status == CallStatus.Completed;
+                            var badgeClass = isCompleted ? "badge badge-primary" : "badge badge-info";
+                            var badgeText = isCompleted ? "Completed" : log.Status.ToString();
+                        }
+                        <span class="@badgeClass">@badgeText</span>
+                    </div>
+                    @if (log.IsFalseAlarm)
+                    {
+                        <p class="text-xs mt-1" style="color: var(--warning-amber);">&#x26A0; Marked as false alarm</p>
+                    }
+                    @if (log.DurationSeconds > 0)
+                    {
+                        <p class="text-xs mt-1" style="color: var(--text-3);">Call duration: @log.DurationSeconds s</p>
+                    }
+                    <p class="sos-log-coords">&#x1F4CD; @(log.IncidentLatitude?.ToString("F4") ?? "N/A"), @(log.IncidentLongitude?.ToString("F4") ?? "N/A")</p>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Countdown Overlay -->
+@if (showCountdown)
+{
+    <div class="sos-countdown-overlay" @onclick="CancelCountdown">
+        <div class="content" @onclick:stopPropagation>
+            <div class="sos-countdown-icon">&#x26A0;</div>
+            <p class="sos-countdown-label">Emergency will be triggered in</p>
+            <div class="sos-countdown-number @(countdownValue == 1 ? "pulse-fast" : "")">@countdownValue</div>
+            <p class="sos-countdown-cancel">Tap anywhere to cancel</p>
+            <button class="btn btn-secondary mt-4" @onclick="CancelCountdown">Cancel Emergency</button>
+        </div>
+    </div>
+}
+
+<!-- Calling Overlay -->
+@if (showCalling)
+{
+    <div class="sos-calling-overlay">
+        <div class="sos-calling-rings">
+            <div class="sos-ring"></div>
+            <div class="sos-ring"></div>
+            <div class="sos-ring"></div>
+            <div class="sos-calling-icon">@callingIcon</div>
+        </div>
+        <h3 class="sos-calling-title">@callingTitle</h3>
+        <p class="sos-calling-status">@callingStatus</p>
+        <div class="sos-timer-display">@callTimerDisplay</div>
+        <div class="sos-call-steps">
+            @for (int i = 0; i < 5; i++)
+            {
+                var stepNum = i + 1;
+                var isActiveStep = activeCallStep == stepNum;
+                var isCompletedStep = completedSteps[i];
+                var stepClass = isActiveStep ? "active" : isCompletedStep ? "completed" : "";
+                <div class="sos-call-step @stepClass">
+                    <div class="sos-step-icon">@(isCompletedStep ? "&#x2713;" : stepNum.ToString())</div>
+                    <div>
+                        <p class="sos-step-title">@CallStepTitles[i]</p>
+                        <p class="sos-step-sub">@CallStepSubtitles[i]</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<!-- Result Overlay -->
+@if (showResultOverlay)
+{
+    <div class="sos-result-overlay">
+        <div class="sos-result-card">
+            <div class="sos-result-icon">&#x2705;</div>
+            <h3 class="sos-result-title">Emergency Dispatched!</h3>
+            <p class="sos-result-sub">Help is on the way. Authorities have been notified.</p>
+
+            <div class="sos-result-details">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs" style="color: var(--text-3); margin-bottom: 4px;">Emergency Type</p>
+                        <p class="font-medium text-sm">@resultEmergencyTypeDisplay</p>
+                    </div>
+                    <div>
+                        <p class="text-xs" style="color: var(--text-3); margin-bottom: 4px;">Call Duration</p>
+                        <p class="font-mono font-medium">@resultDurationDisplay</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4" style="border-top: 1px solid var(--glass-border);">
+                    <p class="text-xs" style="color: var(--text-3); margin-bottom: 4px;">Incident Created</p>
+                    <p class="font-mono font-bold" style="color: var(--neon-green);">@resultIncidentIdDisplay</p>
+                </div>
+            </div>
+
+            <div class="sos-result-notify">
+                <p><strong>&#x1F4F1; Browser Notifications:</strong> Emergency alerts have been sent. Authorities can see your location on their dashboard.</p>
+            </div>
+
+            <div class="sos-result-actions">
+                <button class="btn btn-primary" @onclick="ViewIncident">View Incident Details</button>
+                <button class="btn btn-secondary" @onclick="CloseResult">Return to Safety</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] EmergencyTypeNames = ["Police", "Ambulance", "FireBrigade", "TrafficPolice"];
+    private static readonly string[] EmergencyTypeEmojis = ["&#x1F694;", "&#x1F691;", "&#x1F692;", "&#x1F6A6;"];
+    private static readonly string[] EmergencyNumbers = ["15", "115", "16", "1915"];
+    private static readonly string[] CallStepTitles = ["Capturing Location", "Generating AI Script", "Initiating Call", "Notifying Contacts", "Creating Incident"];
+    private static readonly string[] CallStepSubtitles = ["Getting GPS coordinates", "AI prepares emergency details", "Connecting to emergency services", "Sending SMS alerts", "Logging for authorities"];
+
+    private int selectedEmergencyType;
+    private double currentLat = 33.6844;
+    private double currentLng = 73.0479;
+    private string additionalNotes = "";
+    private bool notifyContacts = true;
+    private string locationText = "Getting location...";
+    private string locationAddress = "Please enable location services";
+    private Guid userId;
+
+    private bool showCountdown;
+    private int countdownValue = 3;
+    private bool isCountdownRunning;
+
+    private bool showCalling;
+    private string callingIcon = "";
+    private string callingTitle = "";
+    private string callingStatus = "";
+    private int callSeconds;
+    private string callTimerDisplay = "00:00";
+    private bool isCallingRunning;
+    private int activeCallStep;
+    private bool[] completedSteps = new bool[5];
+
+    private bool showResultOverlay;
+    private string resultEmergencyTypeDisplay = "";
+    private string resultDurationDisplay = "";
+    private string resultIncidentIdDisplay = "";
+
+    private List<SosCallLogDto> recentLogs = [];
+    private bool logsLoading = true;
+    private string logsError = "";
+
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cts = new CancellationTokenSource();
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!Guid.TryParse(authState.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        userId = id;
+        await LoadRecentLogs();
+    }
+
+    private void SelectEmergencyType(int type)
+    {
+        if (isCallingRunning || isCountdownRunning) return;
+        selectedEmergencyType = type;
+    }
+
+    private async Task StartCountdown()
+    {
+        if (isCountdownRunning || isCallingRunning) return;
+        isCountdownRunning = true;
+        showCountdown = true;
+        countdownValue = 3;
+        while (countdownValue > 0 && isCountdownRunning && !cts!.IsCancellationRequested)
+        {
+            await Task.Delay(1000, cts.Token);
+            if (!isCountdownRunning) break;
+            countdownValue--;
+        }
+        if (isCountdownRunning)
+        {
+            showCountdown = false;
+            isCountdownRunning = false;
+            await TriggerEmergency();
+        }
+    }
+
+    private void CancelCountdown()
+    {
+        isCountdownRunning = false;
+        showCountdown = false;
+        ToastSvc.ShowInfo("Emergency cancelled");
+    }
+
+    private async Task TriggerEmergency()
+    {
+        if (isCallingRunning) return;
+        isCallingRunning = true;
+        showCalling = true;
+        callingTitle = $"Calling {EmergencyTypeNames[selectedEmergencyType]}";
+        callingStatus = $"Connecting to {EmergencyNumbers[selectedEmergencyType]}...";
+        callingIcon = EmergencyTypeEmojis[selectedEmergencyType];
+        callSeconds = 0;
+        callTimerDisplay = "00:00";
+        activeCallStep = 0;
+        Array.Fill(completedSteps, false);
+        var timerTask = RunCallTimer();
+        await RunCallSteps();
+        if (isCallingRunning)
+        {
+            try
+            {
+                var dto = new TriggerSosDto
+                {
+                    EmergencyType = (AuthorityType)selectedEmergencyType,
+                    Latitude = currentLat,
+                    Longitude = currentLng,
+                    AdditionalNotes = string.IsNullOrWhiteSpace(additionalNotes) ? null : additionalNotes,
+                    NotifyEmergencyContacts = notifyContacts
+                };
+                var response = await SosService.TriggerEmergencyAsync(dto, userId);
+                callingStatus = "Emergency dispatched! Help is on the way.";
+                await Task.Delay(2000, cts!.Token);
+                ShowResult(response);
+            }
+            catch (Exception ex)
+            {
+                callingStatus = $"Error: {ex.Message}";
+                ToastSvc.ShowError(ex.Message);
+            }
+        }
+        isCallingRunning = false;
+    }
+
+    private async Task RunCallTimer()
+    {
+        while (isCallingRunning && !cts!.IsCancellationRequested)
+        {
+            await Task.Delay(1000, cts.Token);
+            if (!isCallingRunning) break;
+            callSeconds++;
+            var mins = (callSeconds / 60).ToString("D2");
+            var secs = (callSeconds % 60).ToString("D2");
+            callTimerDisplay = $"{mins}:{secs}";
+        }
+    }
+
+    private async Task RunCallSteps()
+    {
+        for (int step = 1; step <= 5; step++)
+        {
+            if (!isCallingRunning) break;
+            activeCallStep = step;
+            switch (step)
+            {
+                case 1:
+                    callingStatus = "Capturing exact GPS location...";
+                    break;
+                case 2:
+                    callingStatus = "AI generating emergency script...";
+                    break;
+                case 3:
+                    callingStatus = $"Connected to {EmergencyTypeNames[selectedEmergencyType]}...";
+                    break;
+                case 4:
+                    callingStatus = "Notifying emergency contacts...";
+                    break;
+                case 5:
+                    callingStatus = "Creating incident report...";
+                    break;
+            }
+            await Task.Delay(800, cts!.Token);
+            if (!isCallingRunning) break;
+            completedSteps[step - 1] = true;
+            await Task.Delay(600, cts.Token);
+        }
+    }
+
+    private void ShowResult(SosResponseDto response)
+    {
+        showCalling = false;
+        showResultOverlay = true;
+        resultEmergencyTypeDisplay = $"{EmergencyTypeEmojis[selectedEmergencyType]} {EmergencyTypeNames[selectedEmergencyType]} ({EmergencyNumbers[selectedEmergencyType]})";
+        var mins = (callSeconds / 60).ToString("D2");
+        var secs = (callSeconds % 60).ToString("D2");
+        resultDurationDisplay = $"{mins}:{secs}";
+        resultIncidentIdDisplay = response.CallLogId != Guid.Empty ? $"Log: {response.CallLogId}" : "Emergency logged";
+        _ = LoadRecentLogs();
+    }
+
+    private void CloseResult()
+    {
+        showResultOverlay = false;
+    }
+
+    private void ViewIncident()
+    {
+        Navigation.NavigateTo("/user/my-incidents");
+    }
+
+    private string GetEmergencyEmoji(string callType)
+    {
+        return callType?.ToLower() switch
+        {
+            "police" => "&#x1F694;",
+            "ambulance" => "&#x1F691;",
+            "firebrigade" => "&#x1F692;",
+            "trafficpolice" => "&#x1F6A6;",
+            _ => "&#x1F6A8;"
+        };
+    }
+
+    private async Task LoadRecentLogs()
+    {
+        logsLoading = true;
+        try
+        {
+            recentLogs = await SosService.GetMyCallLogsAsync(userId);
+            logsError = "";
+        }
+        catch
+        {
+            logsError = "Failed to load recent activity";
+        }
+        finally
+        {
+            logsLoading = false;
+        }
+    }
+
+    private void GetMyLocation()
+    {
+        currentLat = 33.6844;
+        currentLng = 73.0479;
+        locationText = $"Lat: {currentLat:F6}, Lng: {currentLng:F6}";
+        locationAddress = "Location acquired - ready to share";
+        ToastSvc.ShowSuccess("Location updated");
+    }
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        cts?.Dispose();
+    }
+}

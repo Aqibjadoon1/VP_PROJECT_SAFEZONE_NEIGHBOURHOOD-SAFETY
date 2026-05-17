@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+
+<div class="ambient-glow-2"></div>
+
+<nav class="glass fixed top-0 left-0 right-0 z-50" style="border-radius: 0;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex items-center gap-3">
+                <a href="/" class="flex items-center gap-2">
+                    <h1 class="font-display text-xl font-extrabold" style="color: var(--primary);">SafeZone</h1>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-4">
+                <a href="/login" class="btn btn-secondary btn-sm">Sign In</a>
+                <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="pt-20">
+    @Body
+</div>
+
+<Toast />

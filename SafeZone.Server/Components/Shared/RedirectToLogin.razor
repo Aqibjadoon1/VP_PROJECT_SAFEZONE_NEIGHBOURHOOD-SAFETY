@@ -1,0 +1,38 @@
+@inject NavigationManager Navigation
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private bool _hasRedirected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_hasRedirected)
+        {
+            return;
+        }
+
+        _hasRedirected = true;
+
+        var authenticationState = AuthenticationStateTask is not null
+            ? await AuthenticationStateTask
+            : null;
+
+        if (authenticationState?.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/access-denied", true);
+            return;
+        }
+
+        var returnUrl = Uri.EscapeDataString(GetLocalReturnUrl());
+        Navigation.NavigateTo($"/login?returnUrl={returnUrl}", true);
+    }
+
+    private string GetLocalReturnUrl()
+    {
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return string.IsNullOrWhiteSpace(relativePath)
+            ? "/"
+            : $"/{relativePath}";
+    }
+}

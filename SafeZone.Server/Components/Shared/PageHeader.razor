@@ -1,0 +1,46 @@
+@if (!string.IsNullOrEmpty(Title))
+{
+    <div class="page-header">
+        @if (ShowBreadcrumbs)
+        {
+            <div class="breadcrumbs">
+                <a href="@HomeUrl">@HomeLabel</a>
+                @foreach (var crumb in Breadcrumbs)
+                {
+                    <span class="separator">/</span>
+                    if (!string.IsNullOrEmpty(crumb.Url))
+                    {
+                        <a href="@crumb.Url">@crumb.Label</a>
+                    }
+                    else
+                    {
+                        <span class="current">@crumb.Label</span>
+                    }
+                }
+            </div>
+        }
+        <h1>@Title</h1>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <p>@Subtitle</p>
+        }
+        @if (Actions is not null)
+        {
+            <div class="mt-4 flex gap-3">
+                @Actions
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Subtitle { get; set; } = "";
+    [Parameter] public bool ShowBreadcrumbs { get; set; }
+    [Parameter] public string HomeUrl { get; set; } = "/user/dashboard";
+    [Parameter] public string HomeLabel { get; set; } = "Dashboard";
+    [Parameter] public List<BreadcrumbItem> Breadcrumbs { get; set; } = new();
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    public record BreadcrumbItem(string Label, string? Url = null);
+}

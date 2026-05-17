@@ -1,0 +1,394 @@
+@page "/user/my-firs"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject IFirService FirService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+@inject UserManager<global::SafeZone.Server.Models.User> UserManager
+
+<div class="pb-8 px-4 max-w-6xl mx-auto" style="margin-top: 2rem;">
+    <PageHeader Title="My FIR Reports" Subtitle="Track your First Information Reports">
+        <Actions>
+            <a href="/user/file-fir" class="btn btn-primary">+ File New FIR</a>
+        </Actions>
+    </PageHeader>
+
+    <div class="filter-bar mb-6" id="statusTabs">
+        <button class="filter-tag @(currentFilter == null ? "active" : "")" @onclick="() => FilterByStatus(null)">
+            All
+        </button>
+        @foreach (var status in Enum.GetValues<FIRStatus>())
+        {
+            var s = status;
+            <button class="filter-tag @(currentFilter.HasValue && currentFilter.Value == (int)s ? "active" : "")" @onclick="() => FilterByStatus((int)s)">
+                @GetStatusLabel(s)
+            </button>
+        }
+    </div>
+
+    <div class="glass-elevated rounded-xl overflow-hidden">
+        <div class="table-responsive overflow-x-auto">
+            <table class="w-full @(filteredFirs.Count == 0 ? "hidden" : "")">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--glass-border); background: var(--glass);">
+                        <th class="text-left p-4 font-medium text-sm text-muted">FIR Number</th>
+                        <th class="text-left p-4 font-medium text-sm text-muted">Incident</th>
+                        <th class="text-left p-4 font-medium text-sm text-muted">Status</th>
+                        <th class="text-left p-4 font-medium text-sm text-muted">Submitted</th>
+                        <th class="text-left p-4 font-medium text-sm text-muted">Reviewed By</th>
+                        <th class="text-left p-4 font-medium text-sm text-muted">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var fir in filteredFirs)
+                    {
+                        <tr style="border-bottom: 1px solid var(--glass-border);" class="hover:bg-white/[0.02] transition-colors">
+                            <td class="p-4">
+                                <span class="font-mono font-medium" style="color: var(--primary);">@fir.FirNumber</span>
+                            </td>
+                            <td class="p-4">
+                                @(fir.IncidentTitle ?? "Standalone FIR")
+                                <div class="text-xs text-muted mt-1">Incident ID: @(fir.IncidentId.ToString()[..Math.Min(8, fir.IncidentId.ToString().Length)])</div>
+                            </td>
+                            <td class="p-4">
+                                <span class="status-badge @GetStatusClass(fir.Status)">
+                                    <span>@GetStatusIcon(fir.Status)</span>
+                                    @GetStatusLabel(fir.Status)
+                                </span>
+                            </td>
+                            <td class="p-4">
+                                <div class="text-sm">@fir.SubmittedAt.ToLocalTime().ToString("MMM dd, yyyy")</div>
+                                <div class="text-xs text-muted">@fir.SubmittedAt.ToLocalTime().ToString("hh:mm tt")</div>
+                            </td>
+                            <td class="p-4">
+                                @if (!string.IsNullOrEmpty(fir.ReviewedByName))
+                                {
+                                    <span>@fir.ReviewedByName</span>
+                                    @if (fir.ReviewedAt.HasValue)
+                                    {
+                                        <div class="text-xs text-muted">@fir.ReviewedAt.Value.ToLocalTime().ToString("MMM dd, yyyy")</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Pending</span>
+                                }
+                            </td>
+                            <td class="p-4">
+                                <button class="btn btn-secondary btn-sm" @onclick="() => ShowDetails(fir.FirId)">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="@(filteredFirs.Count > 0 ? "hidden" : "")">
+                <EmptyState Icon="📋" Title="No FIR Reports Yet" Message="You haven't filed any FIR reports yet.">
+                    <Action>
+                        <a href="/user/file-fir" class="btn btn-primary">File Your First FIR</a>
+                    </Action>
+                </EmptyState>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (showModal && selectedFir is not null)
+{
+    <div class="modal-overlay active" @onclick="CloseModalOnBackdrop" @onkeydown="HandleKeyDown" @ref="modalOverlayRef" tabindex="0">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="flex justify-between items-center p-6" style="border-bottom: 1px solid var(--glass-border);">
+                <div>
+                    <h3 class="font-display text-xl font-bold">@selectedFir.FirNumber</h3>
+                    <p class="text-sm text-muted">Submitted on @selectedFir.SubmittedAt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</p>
+                </div>
+                <button class="btn btn-secondary btn-sm w-10 h-10 p-0 flex items-center justify-center" @onclick="CloseModal">✕</button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="status-badge @GetStatusClass(selectedFir.Status)">
+                            <span>@GetStatusIcon(selectedFir.Status)</span>
+                            @GetStatusLabel(selectedFir.Status)
+                        </span>
+                    </div>
+                    @if (selectedFir.Status == FIRStatus.Rejected && !string.IsNullOrEmpty(selectedFir.RejectionReason))
+                    {
+                        <div class="p-3 rounded-lg mt-3" style="background: var(--danger-dim); border: 1px solid var(--danger);">
+                            <p class="text-sm" style="color: var(--danger);"><strong>Rejection Reason:</strong> @selectedFir.RejectionReason</p>
+                        </div>
+                    }
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-1">Complainant</p>
+                        <p class="font-medium">@selectedFir.ComplainantName</p>
+                        <p class="text-sm text-muted">CNIC: @selectedFir.ComplainantCNIC</p>
+                        @if (!string.IsNullOrEmpty(selectedFir.ComplainantPhone))
+                        {
+                            <p class="text-sm text-muted">Phone: @selectedFir.ComplainantPhone</p>
+                        }
+                        @if (!string.IsNullOrEmpty(selectedFir.ComplainantAddress))
+                        {
+                            <p class="text-sm text-muted">Address: @selectedFir.ComplainantAddress</p>
+                        }
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-1">Incident</p>
+                        <p class="font-medium">@(selectedFir.IncidentTitle ?? "Standalone FIR")</p>
+                        <p class="text-sm text-muted">Date: @selectedFir.IncidentDateTime.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</p>
+                        <p class="text-sm text-muted">Place: @selectedFir.IncidentPlace</p>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-xs text-muted mb-2">Incident Narrative</p>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="whitespace-pre-wrap text-sm">@selectedFir.IncidentNarrative</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    @if (!string.IsNullOrEmpty(selectedFir.PropertyLost))
+                    {
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Property Lost</p>
+                            <p class="font-medium text-sm">@selectedFir.PropertyLost</p>
+                            @if (selectedFir.EstimatedLoss > 0)
+                            {
+                                <p class="text-sm text-muted">Est. Loss: PKR @selectedFir.EstimatedLoss.ToString("N0")</p>
+                            }
+                        </div>
+                    }
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-1">Accused Info</p>
+                        <p class="font-medium text-sm">@(selectedFir.AccusedKnown ? "Known" : "Unknown")</p>
+                        <p class="text-sm text-muted">Count: @selectedFir.NumberOfAccused</p>
+                        @if (!string.IsNullOrEmpty(selectedFir.AccusedName))
+                        {
+                            <p class="text-sm text-muted">Name: @selectedFir.AccusedName</p>
+                        }
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-1">Location Coords</p>
+                        <p class="font-mono text-sm">@selectedFir.IncidentLatitude.ToString("F4"), @selectedFir.IncidentLongitude.ToString("F4")</p>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(selectedFir.WitnessDetails))
+                {
+                    <div class="mb-6">
+                        <p class="text-xs text-muted mb-2">Witness Details</p>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-sm">@selectedFir.WitnessDetails</p>
+                        </div>
+                    </div>
+                }
+
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <p class="text-xs text-muted mb-1">Submitted By</p>
+                            <p class="font-medium text-sm">@(selectedFir.ReporterName ?? "You")</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted mb-1">Reviewed By</p>
+                            <p class="font-medium text-sm">@(selectedFir.ReviewedByName ?? "Pending")</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted mb-1">Declaration</p>
+                            <p class="font-medium text-sm">@(selectedFir.DeclarationAccepted ? "Accepted" : "N/A")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .status-submitted {
+        background: rgba(102, 102, 255, 0.15);
+        color: #6666FF;
+    }
+    .status-underreview {
+        background: rgba(255, 184, 0, 0.15);
+        color: #FFB800;
+    }
+    .status-accepted {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00FF88;
+    }
+    .status-rejected {
+        background: rgba(255, 59, 92, 0.15);
+        color: #FF3B5C;
+    }
+    .status-investigating {
+        background: rgba(168, 85, 247, 0.15);
+        color: #A855F7;
+    }
+    .status-closed {
+        background: rgba(100, 116, 139, 0.15);
+        color: #64748B;
+    }
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 20px;
+    }
+    .modal-overlay.active {
+        animation: fadeIn 0.2s ease;
+    }
+    .modal-content {
+        background: var(--glass-elevated);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 700px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+</style>
+
+@code {
+    private List<FirListDto> allFirs = new();
+    private List<FirListDto> filteredFirs = new();
+    private int? currentFilter;
+    private bool showModal;
+    private FirResponseDto? selectedFir;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFirs();
+    }
+
+    private async Task LoadFirs()
+    {
+        try
+        {
+            isLoading = true;
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var user = state.User;
+            var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                return;
+
+            allFirs = await FirService.GetMyFirsAsync(userId);
+            ApplyFilter();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterByStatus(int? status)
+    {
+        currentFilter = status;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (currentFilter.HasValue)
+            filteredFirs = allFirs.Where(f => (int)f.Status == currentFilter.Value).ToList();
+        else
+            filteredFirs = allFirs;
+    }
+
+    private async Task ShowDetails(Guid firId)
+    {
+        try
+        {
+            selectedFir = await FirService.GetFirByIdAsync(firId);
+            if (selectedFir is not null)
+            {
+                showModal = true;
+                await Task.Yield();
+                if (modalOverlayRef.HasValue)
+                    await modalOverlayRef.Value.FocusAsync();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedFir = null;
+    }
+
+    private void CloseModalOnBackdrop(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        CloseModal();
+    }
+
+    private void HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseModal();
+    }
+
+    private ElementReference? modalOverlayRef;
+
+    private static string GetStatusLabel(FIRStatus status) => status switch
+    {
+        FIRStatus.Submitted => "Submitted",
+        FIRStatus.UnderReview => "Under Review",
+        FIRStatus.Accepted => "Accepted",
+        FIRStatus.Rejected => "Rejected",
+        FIRStatus.Investigating => "Investigating",
+        FIRStatus.Closed => "Closed",
+        _ => status.ToString()
+    };
+
+    private static string GetStatusIcon(FIRStatus status) => status switch
+    {
+        FIRStatus.Submitted => "\U0001F4E4",
+        FIRStatus.UnderReview => "\U0001F50D",
+        FIRStatus.Accepted => "\u2705",
+        FIRStatus.Rejected => "\u274C",
+        FIRStatus.Investigating => "\U0001F575\uFE0F",
+        FIRStatus.Closed => "\U0001F4D5",
+        _ => ""
+    };
+
+    private static string GetStatusClass(FIRStatus status) => status switch
+    {
+        FIRStatus.Submitted => "status-submitted",
+        FIRStatus.UnderReview => "status-underreview",
+        FIRStatus.Accepted => "status-accepted",
+        FIRStatus.Rejected => "status-rejected",
+        FIRStatus.Investigating => "status-investigating",
+        FIRStatus.Closed => "status-closed",
+        _ => ""
+    };
+}

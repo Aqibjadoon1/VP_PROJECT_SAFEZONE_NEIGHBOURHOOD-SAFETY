@@ -1,0 +1,239 @@
+@page "/"
+@inject IJSRuntime JS
+
+<div class="hero-section">
+    <div class="hero-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <div class="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center" style="min-height: calc(100vh - 160px);">
+            <div class="text-center lg:text-left order-2 lg:order-1">
+                <div class="inline-block mb-6">
+                    <span class="badge badge-primary">
+                        <span class="live-dot"></span> Live Safety Monitoring
+                    </span>
+                </div>
+
+                <h1 class="font-display text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
+                    Your Neighborhood,
+                    <br>
+                    <span class="hero-highlight">Protected.</span>
+                </h1>
+
+                <p class="text-xl mb-8 max-w-xl hero-subtitle">
+                    SafeZone connects residents with emergency services through real-time incident reporting,
+                    AI-powered emergency calls, and live neighborhood mapping.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                    <a href="/register" class="btn btn-primary btn-lg hero-cta">
+                        Join SafeZone &rarr;
+                    </a>
+                    <a href="/login" class="btn btn-outline-primary btn-lg hero-cta">
+                        Sign In
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-3 gap-8 mt-12 pt-8 hero-stats" style="border-top: 1px solid var(--glass-border);">
+                    <div class="hero-stat-item">
+                        <p class="hero-stat-value counter" data-target="15">0</p>
+                        <p class="text-muted text-sm mt-2">Incident Types</p>
+                    </div>
+                    <div class="hero-stat-item">
+                        <p class="hero-stat-value counter" data-target="24">0</p>
+                        <p class="text-muted text-sm mt-2">/7 Support</p>
+                    </div>
+                    <div class="hero-stat-item">
+                        <p class="hero-stat-value counter" data-target="3">0</p>
+                        <p class="text-muted text-sm mt-2">User Roles</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="order-1 lg:order-2 hero-model-wrap">
+                <div id="hero-canvas" class="hero-canvas"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="py-24 relative z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16">
+            <h2 class="font-display text-4xl font-bold mb-4">Why SafeZone?</h2>
+            <p class="text-muted text-lg max-w-2xl mx-auto">
+                Built for CS-284L Visual Programming Lab with cutting-edge web technologies
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">MAP</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">Live Map Integration</h3>
+                <p class="text-muted">
+                    Interactive Leaflet.js map with real-time incident markers, heatmaps,
+                    and proximity-based alerting.
+                </p>
+            </div>
+
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">SOS</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">AI Emergency Calling</h3>
+                <p class="text-muted">
+                    One-tap SOS connects you to police, ambulance, or fire brigade.
+                    SafeZone's configured LLM service prepares a clear emergency script automatically.
+                </p>
+            </div>
+
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">FIR</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">Digital FIR System</h3>
+                <p class="text-muted">
+                    File First Information Reports digitally with our 4-step wizard.
+                    The FIR workflow keeps structured official report data ready for review and records.
+                </p>
+            </div>
+
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">RT</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">Real-Time Updates</h3>
+                <p class="text-muted">
+                    SignalR-powered WebSocket connections for instant incident notifications,
+                    status updates, and proximity alerts.
+                </p>
+            </div>
+
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">OPS</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">Authority Dashboard</h3>
+                <p class="text-muted">
+                    Kanban-style incident management, heatmap analytics, and broadcast alerts
+                    for police and rescue personnel.
+                </p>
+            </div>
+
+            <div class="feature-card glass-elevated p-8" style="border-color: var(--primary);">
+                <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                    <span class="feature-symbol">SEC</span>
+                </div>
+                <h3 class="font-display text-xl font-bold mb-3">Secure & Anonymous</h3>
+                <p class="text-muted">
+                    JWT authentication with optional anonymous reporting.
+                    Your identity is protected when you need it.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-24 relative z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="glass-elevated p-12 tech-stack-panel">
+            <h2 class="font-display text-3xl font-bold mb-8 text-center">Built With Modern Tech</h2>
+            <div class="tech-stack-grid">
+                <div class="tech-card">
+                    <div class="tech-card-icon">BZ</div>
+                    <p class="font-semibold">Blazor Server</p>
+                    <p class="text-muted text-sm">Interactive Razor components over SignalR circuits</p>
+                </div>
+                <div class="tech-item text-center p-4">
+                    <div class="text-4xl mb-2">🟢</div>
+                    <p class="font-semibold">ASP.NET Core 8</p>
+                    <p class="text-muted text-sm">Blazor + Web API</p>
+                </div>
+                <div class="tech-item text-center p-4">
+                    <div class="text-4xl mb-2">🗄️</div>
+                    <p class="font-semibold">EF Core 8</p>
+                    <p class="text-muted text-sm">LocalDB / SQLite</p>
+                </div>
+                <div class="tech-item text-center p-4">
+                    <div class="text-4xl mb-2">🎨</div>
+                    <p class="font-semibold">Tailwind CSS</p>
+                    <p class="text-muted text-sm">Utility-First Styling</p>
+                </div>
+                <div class="tech-item text-center p-4">
+                    <div class="text-4xl mb-2">⚡</div>
+                    <p class="font-semibold">SignalR</p>
+                    <p class="text-muted text-sm">Real-time incident, alert, map, and call hubs</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-card-icon">LF</div>
+                    <p class="font-semibold">Leaflet.js</p>
+                    <p class="text-muted text-sm">Live incident maps and environmental heat layers</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-card-icon">JS</div>
+                    <p class="font-semibold">JavaScript Interop</p>
+                    <p class="text-muted text-sm">Map rendering, heat layers, and landing animations</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-card-icon">3D</div>
+                    <p class="font-semibold">Three.js</p>
+                    <p class="text-muted text-sm">Landing page 3D safety visualization</p>
+                </div>
+                <div class="tech-card">
+                    <div class="tech-card-icon">UI</div>
+                    <p class="font-semibold">Tailwind CDN + Custom CSS</p>
+                    <p class="text-muted text-sm">SafeZone glassmorphism theme and responsive UI utilities</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-24 relative z-10">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="font-display text-4xl md:text-5xl font-extrabold mb-6">
+            Ready to make your neighborhood
+            <span style="color: var(--primary);"> safer?</span>
+        </h2>
+        <p class="text-xl text-muted mb-10 max-w-2xl mx-auto">
+            Join SafeZone today. Built for CS-284L Visual Programming Lab at Air University Islamabad.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/register" class="btn btn-primary btn-lg">
+                Create Account &rarr;
+            </a>
+            <a href="/login" class="btn btn-outline-primary btn-lg">
+                Sign In
+            </a>
+        </div>
+    </div>
+</section>
+
+<footer class="py-12 border-t relative z-10" style="border-color: var(--glass-border);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <h3 class="font-display text-xl font-extrabold" style="color: var(--primary);">SafeZone</h3>
+                <span class="text-muted">&bull;</span>
+                <span class="text-muted text-sm">Neighborhood Safety System</span>
+            </div>
+            <div class="text-center md:text-right">
+                <p class="text-muted text-sm">
+                    CS-284L Visual Programming Lab
+                </p>
+                <p class="text-muted text-sm">
+                    Air University Islamabad &bull; Spring 2026
+                </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { await JS.InvokeVoidAsync("initHeroEffects"); } catch { }
+        }
+    }
+}

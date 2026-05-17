@@ -1,0 +1,37 @@
+<div class="incident-card-tactical @SeverityClass" style="animation-delay: @(Index * 50)ms;" @onclick="OnClick">
+    <div class="incident-card-number">@Incident.IncidentNumber</div>
+    <div class="incident-card-title">@Incident.Title</div>
+    <div class="incident-card-meta">
+        <span>@Incident.CategoryName</span>
+        <span>•</span>
+        <span>@GetTimeAgo(Incident.ReportedAt)</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public IncidentListDto Incident { get; set; } = null!;
+    [Parameter] public int Index { get; set; }
+    [Parameter] public EventCallback<Guid> OnIncidentClick { get; set; }
+
+    private string SeverityClass => Incident.Severity switch
+    {
+        SeverityLevel.Critical => "critical",
+        SeverityLevel.High => "high",
+        SeverityLevel.Medium => "medium",
+        _ => "low"
+    };
+
+    private async Task OnClick()
+    {
+        await OnIncidentClick.InvokeAsync(Incident.IncidentId);
+    }
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime.ToUniversalTime();
+        if (span.TotalMinutes < 1) return "Just now";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours}h ago";
+        return $"{(int)span.TotalDays}d ago";
+    }
+}

@@ -1,0 +1,82 @@
+@page "/user/profile"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject UserManager<User> UserManager
+@inject AuthenticationStateProvider AuthState
+@inject ToastService ToastSvc
+
+<PageHeader Title="My Profile"
+            Subtitle="Manage your personal information and preferences" />
+
+<div class="max-w-2xl">
+    <GlassCard>
+        @if (user != null)
+        {
+            <div class="flex items-center gap-4 mb-6 pb-6" style="border-bottom: 1px solid var(--glass-border);">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold" style="background: var(--primary-dim); color: var(--primary);">
+                    @(user.FullName?.Length > 0 ? user.FullName[..1].ToUpper() : "?")
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold">@user.FullName</h3>
+                    <p class="text-muted text-sm">@user.PhoneNumber</p>
+                    <span class="badge badge-primary mt-1">Resident</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label>Full Name</label>
+                    <input type="text" @bind="user.FullName" />
+                </div>
+                <div>
+                    <label>Phone Number</label>
+                    <input type="text" value="@user.PhoneNumber" disabled />
+                </div>
+                <div>
+                    <label>Email</label>
+                    <input type="email" value="@user.Email" placeholder="Not set" disabled />
+                </div>
+                <div>
+                    <label>Member Since</label>
+                    <input type="text" value="@user.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")" disabled />
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button class="btn btn-primary" @onclick="SaveProfile">Save Changes</button>
+            </div>
+        }
+        else
+        {
+            <LoadingSkeleton Type="page" />
+        }
+    </GlassCard>
+</div>
+
+@code {
+    private User? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is not null)
+        {
+            user = await UserManager.FindByIdAsync(userId);
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (user is null) return;
+        var result = await UserManager.UpdateAsync(user);
+        if (result.Succeeded)
+        {
+            ToastSvc.ShowSuccess("Profile updated successfully");
+        }
+        else
+        {
+            ToastSvc.ShowError("Failed to update profile");
+        }
+    }
+}

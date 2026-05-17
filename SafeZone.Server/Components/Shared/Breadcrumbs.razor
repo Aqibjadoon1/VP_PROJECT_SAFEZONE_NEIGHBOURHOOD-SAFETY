@@ -1,0 +1,28 @@
+<div class="breadcrumbs">
+    <a href="@HomeUrl">@HomeLabel</a>
+    @foreach (var crumb in Items)
+    {
+        <span class="separator">/</span>
+        if (crumb.IsLast)
+        {
+            <span class="current">@crumb.Label</span>
+        }
+        else
+        {
+            <a href="@crumb.Url">@crumb.Label</a>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string HomeUrl { get; set; } = "/user/dashboard";
+    [Parameter] public string HomeLabel { get; set; } = "Dashboard";
+    [Parameter] public List<CrumbItem> Items { get; set; } = new();
+
+    public class CrumbItem
+    {
+        public string Label { get; set; } = "";
+        public string Url { get; set; } = "";
+        public bool IsLast { get; set; }
+    }
+}

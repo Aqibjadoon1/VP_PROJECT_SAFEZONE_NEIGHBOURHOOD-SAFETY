@@ -1,0 +1,11 @@
+@* Reusable stat display card *@
+<div class="stats-card p-4 rounded-xl" style="background: var(--glass); border: 1px solid var(--glass-border);">
+    <p class="text-xs text-muted mb-1">@Label</p>
+    <p class="font-mono font-bold text-3xl" style="color: @Color;">@Value</p>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Color { get; set; } = "var(--text-1)";
+}

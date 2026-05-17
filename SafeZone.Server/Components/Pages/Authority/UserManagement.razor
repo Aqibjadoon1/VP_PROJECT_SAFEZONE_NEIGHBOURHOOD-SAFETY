@@ -1,0 +1,250 @@
+@page "/authority/user-management"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<global::SafeZone.Server.Models.User> UserManager
+@inject NavigationManager Navigation
+@inject ToastService ToastSvc
+
+<div class="relative">
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] opacity-20 pointer-events-none" style="background: radial-gradient(ellipse at center, var(--primary) 0%, transparent 70%);"></div>
+
+    <div class="max-w-7xl mx-auto pb-8 px-4 relative z-10">
+        <PageHeader Title="User Management" Subtitle="Manage all registered users" />
+
+        @if (isLoading)
+        {
+            <LoadingSkeleton Type="stats" />
+        }
+        else
+        {
+            <div class="stats-row">
+                <MetricCard Label="Total Users" Value="@TotalUsers.ToString()" Change="All registered" Accent="primary" />
+                <MetricCard Label="Residents" Value="@ResidentCount.ToString()" Change="Standard accounts" Accent="success" />
+                <MetricCard Label="Authority" Value="@AuthorityCount.ToString()" Change="Police / Rescue" Accent="purple" />
+                <MetricCard Label="SuperAdmins" Value="@SuperAdminCount.ToString()" Change="Full access" Accent="danger" />
+            </div>
+        }
+
+        <GlassCard Class="p-4 mb-6">
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="flex gap-1 flex-wrap">
+                    <button class="btn @(roleFilter == "all" ? "btn-primary" : "btn-ghost")" @onclick='() => { roleFilter = "all"; }'>All</button>
+                    <button class="btn @(roleFilter == "Resident" ? "btn-primary" : "btn-ghost")" @onclick='() => { roleFilter = "Resident"; }'>Resident</button>
+                    <button class="btn @(roleFilter == "Authority" ? "btn-primary" : "btn-ghost")" @onclick='() => { roleFilter = "Authority"; }'>Authority</button>
+                    <button class="btn @(roleFilter == "SuperAdmin" ? "btn-primary" : "btn-ghost")" @onclick='() => { roleFilter = "SuperAdmin"; }'>SuperAdmin</button>
+                </div>
+                <div class="flex-1 min-w-[200px]">
+                    <input type="text" class="form-input w-full" placeholder="Search name or phone..." @bind='searchQuery' />
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" class="form-checkbox" @bind='showInactiveOnly' />
+                    <span class="text-sm text-muted">Show inactive only</span>
+                </label>
+            </div>
+        </GlassCard>
+
+        <GlassCard Class="overflow-hidden" Style="border-radius: 16px;">
+            @if (FilteredUsers.Count == 0)
+            {
+                <EmptyState Icon="👤" Title="No Users Found" Message="No users found matching your filters" />
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--glass-border);">
+                                <th class="p-3 text-left text-muted font-medium">Name</th>
+                                <th class="p-3 text-left text-muted font-medium">Phone</th>
+                                <th class="p-3 text-left text-muted font-medium">Role</th>
+                                <th class="p-3 text-left text-muted font-medium">Status</th>
+                                <th class="p-3 text-left text-muted font-medium">Created</th>
+                                <th class="p-3 text-left text-muted font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in FilteredUsers)
+                            {
+                                <tr style="border-bottom: 1px solid var(--glass-border);">
+                                    <td class="p-3 font-medium">@user.FullName</td>
+                                    <td class="p-3 text-muted">@user.PhoneNumber</td>
+                                    <td class="p-3"><span class="badge badge-@GetRoleBadge(user.Role)">@user.Role</span></td>
+                                    <td class="p-3">
+                                        <span class="badge @(user.IsActive ? "badge-success" : "badge-secondary")">@(user.IsActive ? "Active" : "Inactive")</span>
+                                    </td>
+                                    <td class="p-3 text-muted text-xs">@FormatDate(user.CreatedAt)</td>
+                                    <td class="p-3">
+                                        <div class="flex gap-2">
+                                            <button class="btn btn-sm btn-primary" @onclick='() => OpenRoleModal(user)'>Edit Role</button>
+                                            <button class="btn btn-sm @(user.IsActive ? "btn-danger" : "btn-success")" @onclick='() => OpenConfirmToggle(user)'>@(user.IsActive ? "Deactivate" : "Activate")</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </GlassCard>
+    </div>
+</div>
+
+@if (showRoleModal && selectedUser != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="glass-elevated p-6 w-full max-w-md">
+            <h3 class="font-display text-xl font-bold mb-2">Edit Role</h3>
+            <p class="text-muted mb-4">Change role for <strong>@selectedUser.FullName</strong></p>
+            <div class="mb-4">
+                <select class="form-input w-full" @bind='newRole'>
+                    <option value="Resident">Resident</option>
+                    <option value="Authority">Authority</option>
+                    <option value="SuperAdmin">SuperAdmin</option>
+                </select>
+            </div>
+            <div class="flex gap-3 justify-end">
+                <button class="btn btn-ghost" @onclick='CloseRoleModal' disabled="@isProcessing">Cancel</button>
+                <button class="btn btn-primary" @onclick='SaveRole' disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>Confirm</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showConfirmModal && confirmUser != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="glass-elevated p-6 w-full max-w-md">
+            <h3 class="font-display text-xl font-bold mb-2">@(confirmUser.IsActive ? "Deactivate" : "Activate") User</h3>
+            <p class="text-muted mb-4">Are you sure you want to @(confirmUser.IsActive ? "deactivate" : "activate") <strong>@confirmUser.FullName</strong>?</p>
+            <div class="flex gap-3 justify-end">
+                <button class="btn btn-ghost" @onclick='CloseConfirmToggle' disabled="@isProcessing">Cancel</button>
+                <button class="btn @(confirmUser.IsActive ? "btn-danger" : "btn-success")" @onclick='ToggleActive' disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner"></span>
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <span>@(confirmUser.IsActive ? "Deactivate" : "Activate")</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string roleFilter = "all";
+    private string searchQuery = "";
+    private bool showInactiveOnly;
+    private List<User> allUsers = [];
+    private User? selectedUser;
+    private string? newRole;
+    private bool showRoleModal;
+    private bool showConfirmModal;
+    private bool isProcessing;
+    private bool isLoading = true;
+
+    private int TotalUsers, ResidentCount, AuthorityCount, SuperAdminCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allUsers = await UserManager.Users.OrderByDescending(u => u.CreatedAt).ToListAsync();
+            TotalUsers = allUsers.Count;
+            ResidentCount = allUsers.Count(u => u.Role == UserRole.Resident);
+            AuthorityCount = allUsers.Count(u => u.Role == UserRole.Authority);
+            SuperAdminCount = allUsers.Count(u => u.Role == UserRole.SuperAdmin);
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private List<User> FilteredUsers
+    {
+        get
+        {
+            var q = allUsers.AsEnumerable();
+            if (roleFilter != "all" && Enum.TryParse<UserRole>(roleFilter, true, out var r))
+                q = q.Where(u => u.Role == r);
+            if (showInactiveOnly)
+                q = q.Where(u => !u.IsActive);
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+                q = q.Where(u => u.FullName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || (u.PhoneNumber?.Contains(searchQuery) ?? false));
+            return q.ToList();
+        }
+    }
+
+    private string GetRoleBadge(UserRole r) => r switch
+    {
+        UserRole.Resident => "primary",
+        UserRole.Authority => "purple",
+        UserRole.SuperAdmin => "danger",
+        _ => "secondary"
+    };
+
+    private void OpenRoleModal(User user)
+    {
+        selectedUser = user;
+        newRole = user.Role.ToString();
+        showRoleModal = true;
+    }
+    private void CloseRoleModal() { showRoleModal = false; selectedUser = null; newRole = null; }
+
+    private async Task SaveRole()
+    {
+        if (selectedUser == null || string.IsNullOrEmpty(newRole)) return;
+        if (!Enum.TryParse<UserRole>(newRole, out var parsedRole)) return;
+        isProcessing = true;
+        try
+        {
+            var currentRoles = await UserManager.GetRolesAsync(selectedUser);
+            if (currentRoles.Any())
+                await UserManager.RemoveFromRolesAsync(selectedUser, currentRoles);
+            await UserManager.AddToRoleAsync(selectedUser, newRole);
+            selectedUser.Role = parsedRole;
+            await UserManager.UpdateAsync(selectedUser);
+            ToastSvc.ShowSuccess($"Role updated to {newRole}");
+            CloseRoleModal();
+            ResidentCount = allUsers.Count(u => u.Role == UserRole.Resident);
+            AuthorityCount = allUsers.Count(u => u.Role == UserRole.Authority);
+            SuperAdminCount = allUsers.Count(u => u.Role == UserRole.SuperAdmin);
+        }
+        catch (Exception ex) { ToastSvc.ShowError(ex.Message); }
+        finally { isProcessing = false; }
+    }
+
+    private User? confirmUser;
+    private void OpenConfirmToggle(User user) { confirmUser = user; showConfirmModal = true; }
+    private void CloseConfirmToggle() { confirmUser = null; showConfirmModal = false; }
+
+    private async Task ToggleActive()
+    {
+        if (confirmUser == null) return;
+        isProcessing = true;
+        try
+        {
+            confirmUser.IsActive = !confirmUser.IsActive;
+            await UserManager.UpdateAsync(confirmUser);
+            ToastSvc.ShowSuccess(confirmUser.IsActive ? "User activated" : "User deactivated");
+            CloseConfirmToggle();
+        }
+        catch (Exception ex) { ToastSvc.ShowError(ex.Message); }
+        finally { isProcessing = false; }
+    }
+
+    private string FormatDate(DateTime dt) => dt.ToLocalTime().ToString("MMM dd, yyyy");
+}

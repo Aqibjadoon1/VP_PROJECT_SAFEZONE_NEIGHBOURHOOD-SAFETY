@@ -1,0 +1,7 @@
+<span class="badge badge-severity-@Severity.ToString().ToLower()">
+    @Severity.ToString()
+</span>
+
+@code {
+    [Parameter] public SeverityLevel Severity { get; set; }
+}

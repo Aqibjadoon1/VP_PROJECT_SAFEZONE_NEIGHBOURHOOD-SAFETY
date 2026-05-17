@@ -1,0 +1,58 @@
+<div class="filter-bar">
+    @if (!string.IsNullOrEmpty(SearchPlaceholder))
+    {
+        <div class="search-input">
+            <input type="text"
+                   @bind="SearchQuery"
+                   @bind:event="oninput"
+                   placeholder="@SearchPlaceholder" />
+        </div>
+    }
+    <div class="filter-group">
+        @foreach (var filter in Filters)
+        {
+            <button class="filter-tag @(filter.IsActive ? "active" : "")"
+                    @onclick="() => OnFilterClick.InvokeAsync(filter.Value)">
+                @filter.Label
+            </button>
+        }
+        @ChildContent
+    </div>
+    @if (!string.IsNullOrEmpty(SearchQuery))
+    {
+        <button class="btn btn-ghost btn-sm" @onclick="ClearSearch">Clear</button>
+    }
+</div>
+
+@code {
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search...";
+    [Parameter] public List<FilterOption> Filters { get; set; } = new();
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+    [Parameter] public EventCallback<string> OnFilterClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string _searchQuery = "";
+
+    private string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            _searchQuery = value;
+            OnSearch.InvokeAsync(value);
+        }
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = "";
+        OnSearch.InvokeAsync("");
+    }
+
+    public class FilterOption
+    {
+        public string Label { get; set; } = "";
+        public string Value { get; set; } = "";
+        public bool IsActive { get; set; }
+    }
+}

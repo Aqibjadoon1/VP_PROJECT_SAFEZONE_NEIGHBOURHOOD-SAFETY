@@ -1,0 +1,32 @@
+<div class="glass-card @Class" style="@Style">
+    @if (Header is not null || !string.IsNullOrEmpty(Title))
+    {
+        <div class="glass-card-header">
+            @if (!string.IsNullOrEmpty(Title))
+            {
+                <h3>@Title</h3>
+            }
+            else
+            {
+                @Header
+            }
+            @if (!string.IsNullOrEmpty(ActionUrl))
+            {
+                <a href="@ActionUrl" class="card-action">@ActionText</a>
+            }
+        </div>
+    }
+    <div>
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Header { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Class { get; set; } = "";
+    [Parameter] public string Style { get; set; } = "";
+    [Parameter] public string ActionText { get; set; } = "View All";
+    [Parameter] public string ActionUrl { get; set; } = "";
+}

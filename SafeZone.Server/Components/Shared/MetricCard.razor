@@ -1,0 +1,21 @@
+<div class="metric-card accent-@Accent" style="animation-delay: @(Index * 50)ms;">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <div class="metric-icon">@Icon</div>
+    }
+    <div class="metric-label">@Label</div>
+    <div class="metric-value">@Value</div>
+    @if (!string.IsNullOrEmpty(Change))
+    {
+        <div class="metric-change">@Change</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Change { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Accent { get; set; } = "primary";
+    [Parameter] public int Index { get; set; } = 0;
+}

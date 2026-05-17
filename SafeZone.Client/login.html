@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SafeZone</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/global.css">
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 page-enter">
+    <!-- Ambient Glow Elements -->
+    <div class="ambient-glow-2"></div>
+
+    <!-- Background decorative -->
+    <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-20 blur-3xl" style="background: radial-gradient(circle, #00FF88 0%, transparent 60%);"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="relative z-10 w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <a href="index.html" class="inline-block">
+                <h1 class="font-display text-4xl font-extrabold" style="color: var(--primary); letter-spacing: -1px;">SafeZone</h1>
+            </a>
+            <p class="mt-2" style="color: var(--text-2);">Neighborhood Safety System</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="glass-elevated p-8">
+            <h2 class="font-display text-2xl font-bold mb-2">Welcome Back</h2>
+            <p class="mb-8" style="color: var(--text-2);">Sign in to your SafeZone account</p>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="space-y-6">
+                <!-- Phone Number -->
+                <div class="form-group">
+                    <label for="phoneNumber">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phoneNumber" 
+                        name="phoneNumber" 
+                        placeholder="+923001234567"
+                        autocomplete="tel"
+                        required
+                    >
+                    <p class="text-muted mt-1" style="font-size: 0.8rem;">Test: +923001234567</p>
+                </div>
+
+                <!-- Password -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                        required
+                    >
+                    <p class="text-muted mt-1" style="font-size: 0.8rem;">Test: User123!</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="hidden p-4 rounded-lg" style="background: var(--danger-dim); border: 1px solid var(--severity-critical-border);">
+                    <p id="errorText" style="color: var(--danger);"></p>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn" class="btn btn-primary w-full">
+                    <span id="btnText">Sign In</span>
+                    <span id="btnSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="flex items-center my-6">
+                <div class="flex-1" style="height: 1px; background: var(--glass-border);"></div>
+                <span class="px-4 text-muted" style="font-size: 0.85rem;">or</span>
+                <div class="flex-1" style="height: 1px; background: var(--glass-border);"></div>
+            </div>
+
+            <!-- Register Link -->
+            <p class="text-center" style="color: var(--text-2);">
+                Don't have an account? 
+                <a href="register.html" class="font-semibold" style="color: var(--primary);">Create Account</a>
+            </p>
+        </div>
+
+        <!-- Test Credentials Card -->
+        <div class="glass mt-6 p-6">
+            <p class="text-sm font-semibold mb-3" style="color: var(--purple); text-transform: uppercase; letter-spacing: 1px;">Test Credentials</p>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between items-center p-2 rounded" style="background: var(--glass-hover);">
+                    <span class="badge badge-primary">Resident</span>
+                    <span class="font-mono">+923001234567 / User123!</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded" style="background: var(--glass-hover);">
+                    <span class="badge badge-purple">Authority</span>
+                    <span class="font-mono">+92511112233 / Officer123!</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded" style="background: var(--glass-hover);">
+                    <span class="badge badge-danger">SuperAdmin</span>
+                    <span class="font-mono">+92511234567 / Admin123!</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center mt-6 text-muted" style="font-size: 0.8rem;">
+            CS-284L Visual Programming Lab • Air University Islamabad
+        </p>
+    </div>
+
+    <!-- JavaScript Utilities -->
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/toast.js"></script>
+
+    <!-- Login Logic -->
+    <script>
+        // Redirect if already authenticated
+        if (window.safezoneAuth.redirectIfAuthenticated()) {
+            // Already redirected
+        }
+
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        function setLoading(loading) {
+            submitBtn.disabled = loading;
+            btnText.textContent = loading ? 'Signing In...' : 'Sign In';
+            btnSpinner.classList.toggle('hidden', !loading);
+        }
+
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            hideError();
+            setLoading(true);
+
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const password = document.getElementById('password').value;
+
+            try {
+                const result = await window.safezoneApi.auth.login(phoneNumber, password);
+
+                if (result.success) {
+                    // Store auth state
+                    window.safezoneAuth.login(
+                        result.token,
+                        result.refreshToken,
+                        result.expiresAt,
+                        result.user
+                    );
+
+                    window.safezoneToast.success('Login successful! Redirecting...');
+
+                    // Redirect to appropriate dashboard
+                    setTimeout(() => {
+                        window.location.href = window.safezoneAuth.getDashboardUrl();
+                    }, 800);
+                } else {
+                    showError(result.message || 'Login failed. Please check your credentials.');
+                    window.safezoneToast.error(result.message || 'Login failed');
+                }
+            } catch (err) {
+                showError(err.message || 'Network error. Please try again.');
+                window.safezoneToast.error(err.message || 'Login failed');
+            } finally {
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>

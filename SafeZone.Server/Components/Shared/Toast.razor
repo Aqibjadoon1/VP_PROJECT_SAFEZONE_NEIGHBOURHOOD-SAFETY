@@ -1,0 +1,83 @@
+@using SafeZone.Server.Services
+@inject ToastService ToastSvc
+@implements IDisposable
+
+<div id="toast-container" class="fixed top-24 right-4 z-[999] flex flex-col gap-2" style="pointer-events: none;">
+    @foreach (var toast in Toasts)
+    {
+        <div class="tactical-toast @GetToastClass(toast.Type)"
+             style="animation: toast-slide-in 0.3s ease-out;">
+            <span class="tactical-toast-icon">@GetIcon(toast.Type)</span>
+            <p class="tactical-toast-message">@toast.Message</p>
+            <button class="tactical-toast-close" @onclick="() => RemoveToast(toast.Id)">&times;</button>
+            <div class="tactical-toast-progress" style="animation: toast-progress @(DurationMs)ms linear forwards;"></div>
+        </div>
+    }
+</div>
+
+<style>
+    @@keyframes toast-slide-in {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @@keyframes toast-slide-out {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    @@keyframes toast-progress {
+        from { width: 100%; }
+        to { width: 0%; }
+    }
+</style>
+
+@code {
+    private record ToastItem(Guid Id, string Message, string Type, DateTime CreatedAt);
+    private List<ToastItem> Toasts = new();
+    private const int MaxToasts = 5;
+    private const int DurationMs = 4000;
+
+    protected override void OnInitialized()
+    {
+        ToastSvc.OnShow += HandleShow;
+    }
+
+    private void HandleShow(string message, string type)
+    {
+        var item = new ToastItem(Guid.NewGuid(), message, type, DateTime.UtcNow);
+        Toasts.Add(item);
+        if (Toasts.Count > MaxToasts) Toasts.RemoveAt(0);
+        InvokeAsync(StateHasChanged);
+        _ = Task.Delay(DurationMs).ContinueWith(_ =>
+        {
+            RemoveToast(item.Id);
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void RemoveToast(Guid id)
+    {
+        Toasts.RemoveAll(t => t.Id == id);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string GetIcon(string type) => type switch
+    {
+        "success" => "✓",
+        "warning" => "⚠",
+        "error" => "✕",
+        _ => "ℹ"
+    };
+
+    private string GetToastClass(string type) => type switch
+    {
+        "success" => "toast-success",
+        "warning" => "toast-warning",
+        "error" => "toast-error",
+        _ => "toast-info"
+    };
+
+    public void Dispose()
+    {
+        ToastSvc.OnShow -= HandleShow;
+    }
+}

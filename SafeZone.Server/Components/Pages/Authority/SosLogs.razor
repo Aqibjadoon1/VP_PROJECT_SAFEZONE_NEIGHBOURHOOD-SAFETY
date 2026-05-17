@@ -1,0 +1,228 @@
+@page "/authority/sos-logs"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject ISosService SosService
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthState
+
+<div class="max-w-7xl mx-auto pb-8 px-4">
+    <div class="ambient-glow"></div>
+
+    <PageHeader Title="SOS Call Logs" Subtitle="Monitor emergency calls" />
+
+    @if (isLoading)
+    {
+        <GlassCard Class="rounded-2xl p-8">
+            <LoadingSkeleton Type="page" />
+        </GlassCard>
+    }
+    else if (allLogs.Count == 0)
+    {
+        <GlassCard Class="rounded-2xl p-12">
+            <EmptyState Icon="📞" Title="No SOS Calls" Message="No emergency calls have been logged yet." />
+        </GlassCard>
+    }
+    else
+    {
+        <div class="glass-elevated rounded-2xl p-4 mb-6 flex items-center gap-2 flex-wrap">
+            <button class='btn @(statusFilter == "all" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "all"'>All</button>
+            <button class='btn @(statusFilter == "initiated" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "initiated"'>Initiated</button>
+            <button class='btn @(statusFilter == "ringing" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "ringing"'>Ringing</button>
+            <button class='btn @(statusFilter == "answered" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "answered"'>Answered</button>
+            <button class='btn @(statusFilter == "completed" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "completed"'>Completed</button>
+            <button class='btn @(statusFilter == "failed" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "failed"'>Failed</button>
+            <button class='btn @(statusFilter == "noanswer" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "noanswer"'>No Answer</button>
+            <button class='btn @(statusFilter == "cancelled" ? "btn-primary" : "btn-ghost") text-sm' @onclick='() => statusFilter = "cancelled"'>Cancelled</button>
+        </div>
+
+        <GlassCard Class="rounded-2xl overflow-hidden">
+            <div class="table-responsive">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-muted text-xs uppercase tracking-wider border-b border-white/5">
+                            <th class="px-6 py-4 font-medium">Call Type</th>
+                            <th class="px-6 py-4 font-medium">Phone</th>
+                            <th class="px-6 py-4 font-medium">Status</th>
+                            <th class="px-6 py-4 font-medium">Initiated</th>
+                            <th class="px-6 py-4 font-medium">Duration</th>
+                            <th class="px-6 py-4 font-medium">User</th>
+                            <th class="px-6 py-4 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in FilteredLogs)
+                        {
+                            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                <td class="px-6 py-4">
+                                    <span class="text-xl">@GetCallTypeIcon(log.CallType)</span>
+                                </td>
+                                <td class="px-6 py-4 text-white font-medium">@log.PhoneNumberCalled</td>
+                                <td class="px-6 py-4">
+                                    <span class='badge badge-@GetStatusBadge(log.Status)'>@log.Status</span>
+                                </td>
+                                <td class="px-6 py-4 text-muted text-sm">@FormatDate(log.InitiatedAt)</td>
+                                <td class="px-6 py-4 text-muted text-sm">@FormatDuration(log.DurationSeconds)</td>
+                                <td class="px-6 py-4 text-muted text-sm">@log.TriggeredByUserName</td>
+                                <td class="px-6 py-4">
+                                    <button class='btn btn-ghost text-sm' @onclick='() => OpenDetail(log)'>View</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </GlassCard>
+    }
+
+    @if (showDetail && selectedLog != null)
+    {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @onclick='() => CloseDetail()'>
+            <div class="glass-elevated rounded-2xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" @onclick:stopPropagation>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-display text-xl font-bold text-white">Call Details</h2>
+                    <button class='btn btn-ghost text-muted' @onclick='() => CloseDetail()'>&times;</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">@GetCallTypeIcon(selectedLog.CallType)</span>
+                        <div>
+                            <p class="text-muted text-xs uppercase tracking-wider">Call Type</p>
+                            <p class="text-white font-medium">@selectedLog.CallType</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-muted text-xs uppercase tracking-wider">Phone Number</p>
+                        <p class="text-white font-medium">@selectedLog.PhoneNumberCalled</p>
+                    </div>
+
+                    <div>
+                        <p class="text-muted text-xs uppercase tracking-wider">Status</p>
+                        <span class='badge badge-@GetStatusBadge(selectedLog.Status)'>@selectedLog.Status</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-muted text-xs uppercase tracking-wider">Initiated At</p>
+                            <p class="text-white text-sm">@FormatDate(selectedLog.InitiatedAt)</p>
+                        </div>
+                        <div>
+                            <p class="text-muted text-xs uppercase tracking-wider">Completed At</p>
+                            <p class="text-white text-sm">@(selectedLog.CompletedAt.HasValue ? FormatDate(selectedLog.CompletedAt.Value) : "-")</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-muted text-xs uppercase tracking-wider">Duration</p>
+                        <p class="text-white font-medium">@FormatDuration(selectedLog.DurationSeconds)</p>
+                    </div>
+
+                    <div>
+                        <p class="text-muted text-xs uppercase tracking-wider">User</p>
+                        <p class="text-white font-medium">@selectedLog.TriggeredByUserName</p>
+                    </div>
+
+                    <div>
+                        <p class="text-muted text-xs uppercase tracking-wider">False Alarm</p>
+                        <span class='badge @(selectedLog.IsFalseAlarm ? "badge-danger" : "badge-secondary")'>@(selectedLog.IsFalseAlarm ? "Yes" : "No")</span>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedLog.AIScript))
+                    {
+                        <div>
+                            <p class="text-muted text-xs uppercase tracking-wider mb-2">AI Script</p>
+                            <pre class="bg-black/30 rounded-xl p-4 text-sm text-white/80 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">@selectedLog.AIScript</pre>
+                        </div>
+                    }
+
+                    @if (!selectedLog.IsFalseAlarm)
+                    {
+                        <div class="pt-4 border-t border-white/5">
+                            <button class='btn btn-warning w-full' @onclick='() => MarkFalseAlarm()'>Mark as False Alarm</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string statusFilter = "all";
+    private List<SosCallLogDto> allLogs = [];
+    private SosCallLogDto? selectedLog;
+    private bool showDetail;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { allLogs = await SosService.GetAllCallLogsAsync(); }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private List<SosCallLogDto> FilteredLogs
+    {
+        get
+        {
+            if (statusFilter == "all") return allLogs.OrderByDescending(l => l.InitiatedAt).ToList();
+            if (Enum.TryParse<CallStatus>(statusFilter, true, out var s))
+                return allLogs.Where(l => l.Status == s).OrderByDescending(l => l.InitiatedAt).ToList();
+            return allLogs.OrderByDescending(l => l.InitiatedAt).ToList();
+        }
+    }
+
+    private string GetStatusBadge(CallStatus s) => s switch
+    {
+        CallStatus.Initiated => "warning",
+        CallStatus.Ringing => "primary",
+        CallStatus.Answered => "success",
+        CallStatus.Completed => "secondary",
+        CallStatus.Failed => "danger",
+        CallStatus.NoAnswer => "danger",
+        CallStatus.Cancelled => "secondary",
+        _ => "secondary"
+    };
+
+    private string GetCallTypeIcon(string? callType) => callType?.ToLower() switch
+    {
+        "police" => "👮",
+        "ambulance" => "🚑",
+        "firebrigade" => "🚒",
+        "trafficpolice" => "🚦",
+        _ => "📞"
+    };
+
+    private async Task OpenDetail(SosCallLogDto log)
+    {
+        selectedLog = log;
+        showDetail = true;
+    }
+
+    private void CloseDetail() { showDetail = false; selectedLog = null; }
+
+    private async Task MarkFalseAlarm()
+    {
+        if (selectedLog == null) return;
+        try
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? uid = userIdClaim is not null && Guid.TryParse(userIdClaim, out var u) ? u : null;
+            await SosService.MarkAsFalseAlarmAsync(selectedLog.LogId, uid!.Value);
+            allLogs = await SosService.GetAllCallLogsAsync();
+            CloseDetail();
+        }
+        catch { }
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        if (seconds <= 0) return "-";
+        var ts = TimeSpan.FromSeconds(seconds);
+        return ts.TotalMinutes >= 1 ? $"{ts.Minutes}m {ts.Seconds}s" : $"{ts.Seconds}s";
+    }
+
+    private string FormatDate(DateTime dt) => dt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt");
+}

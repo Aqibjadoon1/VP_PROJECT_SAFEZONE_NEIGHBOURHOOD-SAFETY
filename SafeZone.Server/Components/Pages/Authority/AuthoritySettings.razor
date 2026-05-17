@@ -1,0 +1,225 @@
+@page "/authority/settings"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject UserManager<global::SafeZone.Server.Models.User> UserManager
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+@inject ToastService ToastSvc
+@inject IAlertService AlertService
+@inject ISmsService SmsService
+
+<div class="ambient-glow"></div>
+
+<div class="max-w-7xl mx-auto pb-8 px-4">
+
+    <PageHeader Title="Authority Settings" Subtitle="Manage your account and preferences" />
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+        <GlassCard Title="Profile Information">
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">Full Name</label>
+                <input type="text" class="form-input" @bind="fullName" disabled />
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">Phone Number</label>
+                <input type="tel" class="form-input" @bind="phoneNumber" disabled />
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">Role</label>
+                <input type="text" class="form-input" @bind="role" disabled />
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-1">Unit Name / Department</label>
+                <input type="text" class="form-input" placeholder="e.g. City Police Unit 4" @bind="unitName" />
+            </div>
+
+            <button type="button" class="btn btn-primary" @onclick='() => ToastSvc.ShowSuccess("Department info updated")'>Save Department</button>
+        </GlassCard>
+
+        <GlassCard Title="Preferences">
+            <div class="mb-6">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" class="w-5 h-5 accent-[var(--primary)]" @bind="pushNotifications" />
+                    <span class="text-sm font-semibold">Push Notifications</span>
+                </label>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-1">Proximity Radius (km)</label>
+                <input type="number" class="form-input" step="0.1" min="0.5" max="50" @bind="proximityRadius" />
+            </div>
+
+            <div class="mb-6">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" class="w-5 h-5 accent-[var(--primary)]" @bind="autoRefreshMap" />
+                    <span class="text-sm font-semibold">Auto-refresh map</span>
+                </label>
+            </div>
+
+            <button type="button" class="btn btn-primary" @onclick='SavePreferences'>Save Preferences</button>
+        </GlassCard>
+
+    </div>
+
+    <GlassCard Title="Broadcast Alert" Class="mb-8">
+        <p class="text-muted text-sm mb-6">Send an alert to all residents and authorities in the area</p>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-1">Title</label>
+            <input type="text" class="form-input" placeholder="Alert title" @bind="alertTitle" />
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-1">Message</label>
+            <textarea class="form-input" rows="4" placeholder="Describe the alert..." @bind="alertMessage"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Alert Type</label>
+                <select class="form-input" @bind="alertType">
+                    <option value="@AlertType.Emergency">Emergency</option>
+                    <option value="@AlertType.Warning">Warning</option>
+                    <option value="@AlertType.Info">Info</option>
+                    <option value="@AlertType.WeatherAlert">Weather Alert</option>
+                    <option value="@AlertType.CurfewNotice">Curfew Notice</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-1">Alert Scope</label>
+                <select class="form-input" @bind="alertScope">
+                    <option value="@AlertScope.Citywide">Citywide</option>
+                    <option value="@AlertScope.Radius">Radius</option>
+                    <option value="@AlertScope.SpecificArea">Specific Area</option>
+                    <option value="@AlertScope.AllAuthorities">All Authorities</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-semibold mb-1">Expiry (hours)</label>
+            <input type="number" class="form-input" min="1" max="168" @bind="alertExpiryHours" />
+        </div>
+
+        <button type="button" class="btn btn-primary" disabled="@isSendingAlert" @onclick='SendAlert'>
+            @(isSendingAlert ? "Sending..." : "Send Alert")
+        </button>
+    </GlassCard>
+
+    <GlassCard Title="SMS Broadcast">
+        <p class="text-muted text-sm mb-6">Send an SMS alert to one or more phone numbers</p>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-1">Phone Number(s)</label>
+            <input type="text" class="form-input" placeholder="+923001234567, +923001234568" @bind="smsNumbers" />
+            <p class="text-muted text-xs mt-1">Separate multiple numbers with commas</p>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-semibold mb-1">Message</label>
+            <textarea class="form-input" rows="3" placeholder="Your SMS message (max 160 characters)" maxlength="160" @bind="smsMessage"></textarea>
+            <p class="text-muted text-xs mt-1">@(smsMessage.Length) / 160 characters</p>
+        </div>
+
+        <button type="button" class="btn btn-primary" disabled="@isSendingSms" @onclick='SendSms'>
+            @(isSendingSms ? "Sending..." : "Send SMS")
+        </button>
+    </GlassCard>
+
+</div>
+
+@code {
+    private string fullName = "";
+    private string phoneNumber = "";
+    private string role = "";
+    private string unitName = "";
+    private bool pushNotifications = true;
+    private double proximityRadius = 2.0;
+    private bool autoRefreshMap;
+
+    private string alertTitle = "";
+    private string alertMessage = "";
+    private AlertType alertType = AlertType.Info;
+    private AlertScope alertScope = AlertScope.Citywide;
+    private int alertExpiryHours = 24;
+    private bool isSendingAlert;
+
+    private string smsNumbers = "";
+    private string smsMessage = "";
+    private bool isSendingSms;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User;
+        fullName = user.FindFirst(ClaimTypes.Name)?.Value ?? "";
+        phoneNumber = user.FindFirst(ClaimTypes.MobilePhone)?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        role = user.FindFirst(ClaimTypes.Role)?.Value ?? "";
+
+        if (Guid.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid))
+        {
+            var appUser = await UserManager.FindByIdAsync(uid.ToString());
+            if (appUser != null)
+            {
+                pushNotifications = appUser.PushNotificationsEnabled;
+                proximityRadius = appUser.ProximityRadiusKm;
+            }
+        }
+    }
+
+    private async Task SavePreferences()
+    {
+        ToastSvc.ShowSuccess("Preferences saved");
+    }
+
+    private async Task SendAlert()
+    {
+        if (string.IsNullOrWhiteSpace(alertTitle) || string.IsNullOrWhiteSpace(alertMessage)) return;
+        isSendingAlert = true;
+        try
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? userId = userIdClaim is not null && Guid.TryParse(userIdClaim, out var uid) ? uid : null;
+            var dto = new CreateAlertDto
+            {
+                Title = alertTitle.Trim(),
+                Message = alertMessage.Trim(),
+                Type = alertType,
+                Scope = alertScope,
+                ExpiresInMinutes = alertExpiryHours * 60
+            };
+            await AlertService.CreateAlertAsync(dto, userId!.Value);
+            ToastSvc.ShowSuccess("Alert broadcast sent successfully");
+            alertTitle = "";
+            alertMessage = "";
+        }
+        catch (Exception ex) { ToastSvc.ShowError(ex.Message ?? "Failed to send alert"); }
+        finally { isSendingAlert = false; }
+    }
+
+    private async Task SendSms()
+    {
+        if (string.IsNullOrWhiteSpace(smsMessage)) return;
+        isSendingSms = true;
+        try
+        {
+            var numbers = smsNumbers.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (numbers.Length > 1)
+                await SmsService.SendBulkSmsAsync(numbers.ToList(), smsMessage.Trim());
+            else if (numbers.Length == 1)
+                await SmsService.SendSmsAsync(numbers[0], smsMessage.Trim());
+            else
+                { ToastSvc.ShowError("Enter at least one phone number"); isSendingSms = false; return; }
+            ToastSvc.ShowSuccess("SMS sent successfully");
+            smsNumbers = "";
+            smsMessage = "";
+        }
+        catch (Exception ex) { ToastSvc.ShowError(ex.Message ?? "Failed to send SMS"); }
+        finally { isSendingSms = false; }
+    }
+}

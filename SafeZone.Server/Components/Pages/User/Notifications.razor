@@ -1,0 +1,252 @@
+@page "/user/notifications"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+
+<PageHeader Title="Notifications"
+            Subtitle="Safety alerts and updates from your neighborhood" />
+
+<div class="filter-bar">
+    <div class="filter-group">
+        <button class="filter-tag @(currentFilter == "all" ? "active" : "")" @onclick='() => SetFilter("all")'>🔔 All</button>
+        <button class="filter-tag @(currentFilter == "emergency" ? "active" : "")" @onclick='() => SetFilter("emergency")'>🆘 Emergencies</button>
+        <button class="filter-tag @(currentFilter == "incidents" ? "active" : "")" @onclick='() => SetFilter("incidents")'>📋 Incidents</button>
+        <button class="filter-tag @(currentFilter == "alerts" ? "active" : "")" @onclick='() => SetFilter("alerts")'>📢 Broadcasts</button>
+        <button class="filter-tag @(currentFilter == "system" ? "active" : "")" @onclick='() => SetFilter("system")'>ℹ️ System</button>
+    </div>
+    <div class="flex gap-2">
+        @if (UnreadCount > 0)
+        {
+            <button class="btn btn-secondary btn-sm" @onclick="MarkAllRead">✓ Mark All Read</button>
+        }
+        @if (notifications.Count > 0)
+        {
+            <button class="btn btn-secondary btn-sm" @onclick="ClearAll">🗑️ Clear All</button>
+        }
+    </div>
+</div>
+
+@if (FilteredNotifications.Count == 0)
+{
+    var emptyMessage = currentFilter switch
+    {
+        "all" => "No notifications yet",
+        "emergency" => "No emergency notifications",
+        "incidents" => "No incident updates",
+        "alerts" => "No broadcast alerts",
+        "system" => "No system notifications",
+        _ => "No notifications yet"
+    };
+    var emptyIcon = currentFilter switch
+    {
+        "all" => "🔔",
+        "emergency" => "✅",
+        "incidents" => "📋",
+        "alerts" => "📢",
+        "system" => "ℹ️",
+        _ => "🔔"
+    };
+    <EmptyState Icon="@emptyIcon" Title="@emptyMessage" Message="New notifications will appear here in real-time" />
+}
+else
+{
+    <div class="space-y-3">
+        @foreach (var notif in FilteredNotifications)
+        {
+            <GlassCard Class="cursor-pointer">
+                <div class="flex items-start gap-4" @onclick="() => ShowDetails(notif)">
+                    <div class="notification-icon @notif.IconClass">@notif.Icon</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    @if (notif.Unread)
+                                    {
+                                        <span class="w-2 h-2 rounded-full" style="background: var(--primary);"></span>
+                                    }
+                                    <h4 class="font-semibold">@notif.Title</h4>
+                                </div>
+                                <p class="text-sm text-muted mt-1">@notif.Message</p>
+                            </div>
+                            <span class="text-xs text-muted flex-shrink-0">@FormatTime(notif.Time)</span>
+                        </div>
+                        <div class="flex items-center gap-3 mt-3">
+                            <button class="text-xs text-muted hover:text-white transition-colors" @onclick:stopPropagation @onclick="() => ShowDetails(notif)">View Details →</button>
+                            @if (notif.Unread)
+                            {
+                                <button class="text-xs text-muted hover:text-white transition-colors" @onclick:stopPropagation @onclick="() => MarkAsRead(notif)">Mark Read</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </GlassCard>
+        }
+    </div>
+}
+
+@if (showModal && selectedNotification != null)
+{
+    <div class="modal-overlay" @onclick="CloseModal" @onkeydown="HandleKeyDown" tabindex="-1">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div class="flex items-center gap-3">
+                    <div class="notification-icon @selectedNotification.IconClass">@selectedNotification.Icon</div>
+                    <div>
+                        <h3>@selectedNotification.Title</h3>
+                        <p class="text-xs text-muted mt-1">@FormatDateTime(selectedNotification.Time)</p>
+                    </div>
+                </div>
+                <button class="modal-close" @onclick="CloseModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm">@selectedNotification.Message</p>
+                <div class="mt-4 p-4 rounded-lg" style="background: var(--glass);">
+                    @if (selectedNotification.Details.Count > 0)
+                    {
+                        @foreach (var detail in selectedNotification.Details)
+                        {
+                            <div class="flex justify-between items-center py-2" style="border-bottom: 1px solid var(--glass-border);">
+                                <span class="text-sm text-muted">@detail.Key</span>
+                                <span class="text-sm font-medium">@detail.Value</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-sm text-muted text-center">No additional details</p>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="DismissNotification">Dismiss</button>
+                @if (!string.IsNullOrEmpty(selectedNotification.RelatedType))
+                {
+                    <button class="btn btn-primary" @onclick="() => ViewRelated(selectedNotification.RelatedType)">View Details</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private string currentFilter = "all";
+    private Notification? selectedNotification;
+    private bool showModal;
+    private List<Notification> notifications = new();
+
+    private int UnreadCount => notifications.Count(n => n.Unread);
+
+    private List<Notification> FilteredNotifications =>
+        currentFilter == "all" ? notifications : notifications.Where(n => n.Type == currentFilter).ToList();
+
+    protected override void OnInitialized()
+    {
+        LoadSampleData();
+    }
+
+    private void LoadSampleData()
+    {
+        notifications = new()
+        {
+            new()
+            {
+                Id = "1", Type = "emergency", Icon = "🆘", IconClass = "icon-emergency",
+                Title = "SOS Emergency Nearby",
+                Message = "An SOS emergency has been triggered 1.2km from your location. The user requires police assistance.",
+                Time = DateTime.UtcNow.AddMinutes(-5), Unread = true,
+                Details = new() { ["Distance"] = "1.2 km (approx 5 min drive)", ["Emergency Type"] = "Police", ["Location"] = "F-7 Markaz, Islamabad", ["Call Status"] = "Completed", ["Incident Created"] = "Yes" },
+                RelatedType = "incident"
+            },
+            new()
+            {
+                Id = "2", Type = "alerts", Icon = "📢", IconClass = "icon-warning",
+                Title = "Weather Alert: Heavy Rain",
+                Message = "Authorities have issued a weather advisory. Heavy rainfall expected in your area over the next 3 hours.",
+                Time = DateTime.UtcNow.AddMinutes(-45), Unread = true,
+                Details = new() { ["Issued By"] = "Local Authorities", ["Alert Type"] = "Weather Warning", ["Affected Areas"] = "F-7, G-9, Blue Area", ["Precautions"] = "Carry umbrellas, avoid low-lying areas", ["Valid Until"] = "6:00 PM Today" },
+                RelatedType = null
+            },
+            new()
+            {
+                Id = "3", Type = "incidents", Icon = "📋", IconClass = "icon-incident",
+                Title = "Incident Report Accepted",
+                Message = "Your incident report (#INC-20260510-1234) has been reviewed and accepted by an authority officer.",
+                Time = DateTime.UtcNow.AddHours(-2), Unread = false,
+                Details = new() { ["Incident Number"] = "INC-20260510-1234", ["Status"] = "Accepted → In Progress", ["Assigned To"] = "Officer Ahmed, F-7 Police Station", ["Priority"] = "Medium", ["Expected Response"] = "Within 15 minutes" },
+                RelatedType = "my-incidents"
+            },
+            new()
+            {
+                Id = "4", Type = "system", Icon = "ℹ️", IconClass = "icon-info",
+                Title = "Welcome to SafeZone",
+                Message = "Thank you for joining SafeZone! Your neighborhood safety platform is now active. Report incidents, track safety, and stay connected.",
+                Time = DateTime.UtcNow.AddHours(-24), Unread = false,
+                Details = new() { ["Account Status"] = "Active", ["Role"] = "Resident", ["Features Available"] = "Report Incidents, SOS Emergency, View Safety Alerts", ["Help Center"] = "Available in menu", ["Emergency Contacts"] = "Configurable in settings" },
+                RelatedType = null
+            },
+            new()
+            {
+                Id = "5", Type = "alerts", Icon = "🔴", IconClass = "icon-emergency",
+                Title = "Curfew Notice - Sector G-9",
+                Message = "Emergency curfew announced in Sector G-9 due to ongoing situation. Please remain indoors and stay tuned for updates.",
+                Time = DateTime.UtcNow.AddHours(-6), Unread = false,
+                Details = new() { ["Alert Type"] = "Curfew Notice", ["Affected Area"] = "Sector G-9, Islamabad", ["Start Time"] = "8:00 PM Today", ["End Time"] = "6:00 AM Tomorrow", ["Instructions"] = "Stay indoors, keep doors locked, cooperate with authorities" },
+                RelatedType = null
+            },
+            new()
+            {
+                Id = "6", Type = "incidents", Icon = "✅", IconClass = "icon-success",
+                Title = "Incident Resolved",
+                Message = "Great news! The incident you reported earlier has been resolved. The authorities have closed the case.",
+                Time = DateTime.UtcNow.AddDays(-2), Unread = false,
+                Details = new() { ["Incident Number"] = "INC-20260508-5678", ["Resolution Time"] = "4 hours 23 minutes", ["Resolved By"] = "Traffic Police Unit", ["Outcome"] = "Road cleared, traffic resumed", ["Feedback"] = "You can rate the response in your reports" },
+                RelatedType = "my-incidents"
+            }
+        };
+    }
+
+    private void SetFilter(string filter) { currentFilter = filter; }
+    private void MarkAllRead() { foreach (var n in notifications) n.Unread = false; }
+    private void ClearAll() { notifications.Clear(); }
+
+    private async Task ShowDetails(Notification notif)
+    {
+        selectedNotification = notif;
+        notif.Unread = false;
+        showModal = true;
+        await Task.Delay(10);
+    }
+
+    private void CloseModal() { showModal = false; selectedNotification = null; }
+    private void HandleKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") CloseModal(); }
+    private void DismissNotification() { if (selectedNotification != null) selectedNotification.Unread = false; CloseModal(); }
+    private void MarkAsRead(Notification notif) { notif.Unread = false; }
+    private void ViewRelated(string relatedType) { Navigation.NavigateTo(relatedType); }
+
+    private static string FormatTime(DateTime time)
+    {
+        var diff = DateTime.UtcNow - time;
+        if (diff.TotalSeconds < 60) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays} days ago";
+        return time.ToLocalTime().ToString("d");
+    }
+
+    private static string FormatDateTime(DateTime time) => time.ToLocalTime().ToString("ddd, MMM d, yyyy h:mm tt");
+
+    private class Notification
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string IconClass { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Message { get; set; } = "";
+        public DateTime Time { get; set; }
+        public bool Unread { get; set; }
+        public Dictionary<string, string> Details { get; set; } = new();
+        public string? RelatedType { get; set; }
+    }
+}

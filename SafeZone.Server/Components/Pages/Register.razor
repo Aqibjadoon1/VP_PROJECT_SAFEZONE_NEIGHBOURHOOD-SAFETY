@@ -1,0 +1,146 @@
+@page "/register"
+@layout LoginLayout
+@inject NavigationManager Navigation
+@inject ToastService ToastSvc
+
+<div class="login-page">
+    <div class="login-terminal">
+        <div class="login-terminal-header">Initialize Account</div>
+
+        <EditForm Model="@model" OnValidSubmit="@HandleRegister" class="space-y-5">
+            <DataAnnotationsValidator />
+
+            <div>
+                <label class="login-label">Full Name</label>
+                <InputText class="login-input" @bind-Value="model.FullName" placeholder="John Doe" autocomplete="name" />
+                <ValidationMessage For="@(() => model.FullName)" />
+            </div>
+
+            <div>
+                <label class="login-label">Phone Number</label>
+                <InputText class="login-input" @bind-Value="model.PhoneNumber" placeholder="+923001234567" autocomplete="tel" />
+                <ValidationMessage For="@(() => model.PhoneNumber)" />
+            </div>
+
+            <div>
+                <label class="login-label">Account Type</label>
+                <div style="display: flex; gap: 12px; margin-top: 8px;">
+                    <div style="flex: 1; cursor: pointer;" @onclick="SelectResident">
+                        <div style="padding: 16px; text-align: center; border-radius: var(--radius-md); border: 1px solid var(--glass-border); transition: all 200ms ease; @GetRoleCardStyle("Resident")">
+                            <div style="font-size: 1.5rem; margin-bottom: 8px;">🏠</div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Resident</div>
+                            <div style="font-size: 0.75rem; color: var(--text-3);">Report incidents</div>
+                        </div>
+                    </div>
+                    <div style="flex: 1; cursor: pointer;" @onclick="SelectAuthority">
+                        <div style="padding: 16px; text-align: center; border-radius: var(--radius-md); border: 1px solid var(--glass-border); transition: all 200ms ease; @GetRoleCardStyle("Authority")">
+                            <div style="font-size: 1.5rem; margin-bottom: 8px;">🚔</div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Authority</div>
+                            <div style="font-size: 0.75rem; color: var(--text-3);">Police/Rescue</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="login-label">Password</label>
+                <input type="password" class="login-input" @bind="model.Password" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+
+            <div>
+                <label class="login-label">Confirm Password</label>
+                <input type="password" class="login-input" @bind="model.ConfirmPassword" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="login-alert login-alert-error">
+                    ⚠ @Error
+                </div>
+            }
+
+            <button type="submit" class="login-btn" disabled="@IsLoading">
+                @if (IsLoading)
+                {
+                    <span>PROCESSING...</span>
+                }
+                else
+                {
+                    <span>INITIALIZE ACCOUNT</span>
+                }
+            </button>
+        </EditForm>
+
+        <div style="text-align: center; margin-top: 24px;">
+            <a href="/login" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-3); text-decoration: none; text-transform: uppercase; letter-spacing: 0.1em;">
+                ← Access Terminal
+            </a>
+        </div>
+    </div>
+
+    <p style="text-align: center; margin-top: 24px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em;">
+        SafeZone v1.0 • CS-284L • Air University
+    </p>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? error { get; set; }
+
+    private RegisterDto model = new();
+    private string SelectedRole { get; set; } = "Resident";
+    private string? Error { get; set; }
+    private bool IsLoading { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(error))
+        {
+            Error = Uri.UnescapeDataString(error);
+        }
+    }
+
+    private string GetRoleCardStyle(string role)
+    {
+        return SelectedRole == role ? "border-color: var(--primary); background: var(--primary-dim);" : "";
+    }
+
+    private void SelectResident() { SelectRole("Resident"); }
+    private void SelectAuthority() { SelectRole("Authority"); }
+
+    private void SelectRole(string role)
+    {
+        SelectedRole = role;
+        model.Role = role switch
+        {
+            "Resident" => UserRole.Resident,
+            "Authority" => UserRole.Authority,
+            _ => UserRole.Resident
+        };
+    }
+
+    private void HandleRegister()
+    {
+        Error = null;
+
+        if (model.Password.Length < 6)
+        {
+            Error = "Password must be at least 6 characters.";
+            return;
+        }
+
+        if (model.Password != model.ConfirmPassword)
+        {
+            Error = "Passwords do not match.";
+            return;
+        }
+
+        IsLoading = true;
+
+        var phone = Uri.EscapeDataString(model.PhoneNumber);
+        var password = Uri.EscapeDataString(model.Password);
+        var fullName = Uri.EscapeDataString(model.FullName);
+        var role = Uri.EscapeDataString(SelectedRole);
+
+        Navigation.NavigateTo($"/blazor-register?phone={phone}&password={password}&fullName={fullName}&role={role}", forceLoad: true);
+    }
+}

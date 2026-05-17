@@ -1,0 +1,43 @@
+@page "/_Host"
+@using Microsoft.AspNetCore.Components.Web
+@namespace SafeZone.Server.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeZone</title>
+    <base href="~/" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js" defer></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/css/global.css?v=tactical-v2" />
+    <!-- Scoped CSS bundle removed - no .razor.css files in project -->
+</head>
+<body>
+    <div class="scan-lines"></div>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+    <div id="blazor-error-ui" class="hidden fixed bottom-4 right-4 glass-elevated p-4 z-[999]" style="display:none;">
+        <p class="text-sm mb-2">An unhandled error has occurred.</p>
+        <a href="" class="btn btn-secondary btn-sm">Reload</a>
+        <a href="/" class="btn btn-primary btn-sm ml-2">Home</a>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>window.L || document.write('<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/script>');</script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script>window.L?.heatLayer || document.write('<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"><\/script>');</script>
+    <script src="/js/map.js?v=tactical-heatmap-v2"></script>
+    <script src="/js/index-effects.js?v=blazor-final"></script>
+    <script src="https://unpkg.com/@@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+    <script src="/_framework/blazor.server.js"></script>
+    <elevenlabs-convai agent-id="agent_5701krnna4svebjs5tkv9q85d765"></elevenlabs-convai>
+</body>
+</html>

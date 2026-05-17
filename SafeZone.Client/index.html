@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeZone - Neighborhood Safety System</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/global.css">
+
+    <style>
+        /* Hero-specific styles */
+        #hero-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .hero-section {
+            position: relative;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Animated counters */
+        .counter {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 3rem;
+            line-height: 1;
+        }
+
+        /* Feature card hover */
+        .feature-card {
+            transition: all var(--transition-normal);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1);
+        }
+
+        .feature-icon {
+            transition: transform var(--transition-normal);
+        }
+    </style>
+</head>
+<body class="page-enter">
+    <!-- Ambient Glow Elements -->
+    <div class="ambient-glow-2"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 mt-4">
+                <div class="glass px-6 py-3 rounded-full">
+                    <h1 class="font-display text-xl font-extrabold" style="color: var(--primary); letter-spacing: -0.5px;">SafeZone</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="login.html" class="btn btn-secondary btn-sm">Sign In</a>
+                    <a href="register.html" class="btn btn-primary btn-sm">Get Started</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section flex items-center">
+        <!-- Three.js Canvas Container -->
+        <div id="hero-canvas"></div>
+
+        <div class="hero-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Left: Text Content -->
+                <div class="text-center lg:text-left">
+                    <div class="inline-block mb-6">
+                        <span class="badge badge-primary">
+                            🔴 Live Safety Monitoring
+                        </span>
+                    </div>
+                    
+                    <h1 class="font-display text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
+                        Your Neighborhood,
+                        <br>
+                        <span style="color: var(--primary);">Protected.</span>
+                    </h1>
+                    
+                    <p class="text-xl mb-8 max-w-xl" style="color: var(--text-2);">
+                        SafeZone connects residents with emergency services through real-time incident reporting, 
+                        AI-powered emergency calls, and live neighborhood mapping.
+                    </p>
+
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                        <a href="register.html" class="btn btn-primary btn-lg">
+                            Join SafeZone →
+                        </a>
+                        <a href="login.html" class="btn btn-outline-primary btn-lg">
+                            Sign In
+                        </a>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="grid grid-cols-3 gap-8 mt-12 pt-8" style="border-top: 1px solid var(--glass-border);">
+                        <div class="text-center">
+                            <p class="counter" style="color: var(--primary);" data-target="15">0</p>
+                            <p class="text-muted text-sm mt-2">Incident Types</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="counter" style="color: var(--danger);" data-target="24">0</p>
+                            <p class="text-muted text-sm mt-2">/7 Support</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="counter" style="color: var(--purple);" data-target="3">0</p>
+                            <p class="text-muted text-sm mt-2">User Roles</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: 3D Sphere placeholder (Three.js renders to canvas) -->
+                <div class="hidden lg:block h-96 relative">
+                    <!-- Three.js canvas fills this space -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="font-display text-4xl font-bold mb-4">Why SafeZone?</h2>
+                <p class="text-muted text-lg max-w-2xl mx-auto">
+                    Built for CS-284L Visual Programming Lab with cutting-edge web technologies
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary-dim);">
+                        <span class="text-3xl">🗺️</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">Live Map Integration</h3>
+                    <p class="text-muted">
+                        Interactive Leaflet.js map with real-time incident markers, heatmaps, 
+                        and proximity-based alerting.
+                    </p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--danger-dim);">
+                        <span class="text-3xl">🆘</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">AI Emergency Calling</h3>
+                    <p class="text-muted">
+                        One-tap SOS connects you to police, ambulance, or fire brigade. 
+                        GPT-4o generates the emergency script automatically.
+                    </p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--purple-dim);">
+                        <span class="text-3xl">📄</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">Digital FIR System</h3>
+                    <p class="text-muted">
+                        File First Information Reports digitally with our 4-step wizard. 
+                        QuestPDF generates official PDFs for your records.
+                    </p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--info-dim);">
+                        <span class="text-3xl">⚡</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">Real-Time Updates</h3>
+                    <p class="text-muted">
+                        SignalR-powered WebSocket connections for instant incident notifications, 
+                        status updates, and proximity alerts.
+                    </p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: var(--warning-dim);">
+                        <span class="text-3xl">👮</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">Authority Dashboard</h3>
+                    <p class="text-muted">
+                        Kanban-style incident management, heatmap analytics, and broadcast alerts 
+                        for police and rescue personnel.
+                    </p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="feature-card glass-elevated p-8">
+                    <div class="feature-icon w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style="background: rgba(168,85,247,0.15);">
+                        <span class="text-3xl">🔒</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold mb-3">Secure & Anonymous</h3>
+                    <p class="text-muted">
+                        JWT authentication with optional anonymous reporting. 
+                        Your identity is protected when you need it.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="glass-elevated p-12">
+                <h2 class="font-display text-3xl font-bold mb-8 text-center">Built With Modern Tech</h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🟢</div>
+                        <p class="font-semibold">ASP.NET Core 8</p>
+                        <p class="text-muted text-sm">Web API + SignalR</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🗄️</div>
+                        <p class="font-semibold">EF Core 8</p>
+                        <p class="text-muted text-sm">SQL Server LocalDB</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🎨</div>
+                        <p class="font-semibold">Tailwind CSS</p>
+                        <p class="text-muted text-sm">Utility-First Styling</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🌐</div>
+                        <p class="font-semibold">Three.js</p>
+                        <p class="text-muted text-sm">3D Visualization</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🗺️</div>
+                        <p class="font-semibold">Leaflet.js</p>
+                        <p class="text-muted text-sm">Interactive Maps</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">🤖</div>
+                        <p class="font-semibold">GPT-4o</p>
+                        <p class="text-muted text-sm">AI Agent</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">📞</div>
+                        <p class="font-semibold">Twilio</p>
+                        <p class="text-muted text-sm">Voice + SMS</p>
+                    </div>
+                    <div class="text-center p-4">
+                        <div class="text-4xl mb-2">📄</div>
+                        <p class="font-semibold">QuestPDF</p>
+                        <p class="text-muted text-sm">PDF Generation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24 relative z-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="font-display text-4xl md:text-5xl font-extrabold mb-6">
+                Ready to make your neighborhood
+                <span style="color: var(--primary);"> safer?</span>
+            </h2>
+            <p class="text-xl text-muted mb-10 max-w-2xl mx-auto">
+                Join SafeZone today. Built for CS-284L Visual Programming Lab at Air University Islamabad.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="register.html" class="btn btn-primary btn-lg">
+                    Create Account →
+                </a>
+                <a href="login.html" class="btn btn-outline-primary btn-lg">
+                    Sign In
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 border-t relative z-10" style="border-color: var(--glass-border);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <h3 class="font-display text-xl font-extrabold" style="color: var(--primary);">SafeZone</h3>
+                    <span class="text-muted">•</span>
+                    <span class="text-muted text-sm">Neighborhood Safety System</span>
+                </div>
+                <div class="text-center md:text-right">
+                    <p class="text-muted text-sm">
+                        CS-284L Visual Programming Lab
+                    </p>
+                    <p class="text-muted text-sm">
+                        Air University Islamabad • Spring 2026
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Utilities -->
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/toast.js"></script>
+
+    <!-- Three.js 3D Sphere -->
+    <script>
+        (function() {
+            if (typeof THREE === 'undefined') return;
+
+            const container = document.getElementById('hero-canvas');
+            if (!container) return;
+
+            // Scene setup
+            const scene = new THREE.Scene();
+            
+            // Camera
+            const camera = new THREE.PerspectiveCamera(
+                60,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.z = 5;
+
+            // Renderer
+            const renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true 
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Glowing wireframe sphere
+            const geometry = new THREE.IcosahedronGeometry(1.8, 4);
+            
+            // Material - glowing green wireframe
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x00FF88,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            const sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
+
+            // Inner glow sphere
+            const glowGeometry = new THREE.IcosahedronGeometry(1.5, 4);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00FF88,
+                transparent: true,
+                opacity: 0.1
+            });
+            const innerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+            scene.add(innerGlow);
+
+            // Particles
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particleCount = 200;
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                const radius = 2.5 + Math.random() * 1.5;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                positions[i + 2] = radius * Math.cos(phi);
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const particlesMaterial = new THREE.PointsMaterial({
+                color: 0x00FF88,
+                size: 0.03,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
+
+            // Mouse interaction
+            let mouseX = 0;
+            let mouseY = 0;
+            let targetX = 0;
+            let targetY = 0;
+
+            document.addEventListener('mousemove', function(e) {
+                mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+            });
+
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+
+                // Smooth mouse follow
+                targetX += (mouseX - targetX) * 0.05;
+                targetY += (mouseY - targetY) * 0.05;
+
+                // Rotate sphere
+                sphere.rotation.x += 0.003;
+                sphere.rotation.y += 0.005;
+                sphere.rotation.z += 0.001;
+
+                // Mouse tilt
+                sphere.rotation.x += targetY * 0.02;
+                sphere.rotation.y += targetX * 0.02;
+
+                // Inner glow
+                innerGlow.rotation.x += 0.002;
+                innerGlow.rotation.y += 0.003;
+
+                // Particles
+                particles.rotation.y += 0.001;
+                particles.rotation.x += 0.0005;
+
+                // Camera
+                camera.position.x = targetX * 0.5;
+                camera.position.y = targetY * 0.5;
+                camera.lookAt(scene.position);
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+
+            // Resize handler
+            window.addEventListener('resize', function() {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        })();
+    </script>
+
+    <!-- Animated Counters -->
+    <script>
+        (function() {
+            const counters = document.querySelectorAll('.counter[data-target]');
+            
+            function animateCounter(element) {
+                const target = parseInt(element.getAttribute('data-target'));
+                const duration = 1500;
+                const start = performance.now();
+                
+                function update(currentTime) {
+                    const elapsed = currentTime - start;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Ease out quad
+                    const easeProgress = 1 - (1 - progress) * (1 - progress);
+                    const current = Math.floor(easeProgress * target);
+                    
+                    element.textContent = current + (target === 24 ? '/7' : '');
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(update);
+                    }
+                }
+                
+                requestAnimationFrame(update);
+            }
+
+            // Intersection Observer
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        animateCounter(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.5 });
+
+            counters.forEach(counter => observer.observe(counter));
+        })();
+    </script>
+</body>
+</html>

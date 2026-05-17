@@ -1,0 +1,303 @@
+@page "/authority/field-reports"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject IIncidentService IncidentService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+
+<div class="max-w-7xl mx-auto pb-8 px-4">
+    <div class="relative">
+        <div style="position: absolute; top: -80px; left: 50%; transform: translateX(-50%); width: 600px; height: 300px; background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%); pointer-events: none;"></div>
+
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative">
+            <PageHeader Title="Field Reports" Subtitle="Manage and respond to incident reports" />
+            <button class="btn btn-secondary btn-sm" @onclick='() => RefreshData()' title="Refresh">
+                ↻ Refresh
+            </button>
+        </div>
+
+        @if (isLoading)
+        {
+            <LoadingSkeleton Type="stats" />
+            <div style="margin-top: 16px;">
+                <LoadingSkeleton Type="page" />
+            </div>
+        }
+        else
+        {
+            <div class="stats-row">
+                <MetricCard Label="Pending" Value="@PendingCount.ToString()" Accent="warning" />
+                <MetricCard Label="Assigned" Value="@AssignedCount.ToString()" Accent="primary" />
+                <MetricCard Label="In Progress" Value="@InProgressCount.ToString()" Accent="purple" />
+                <MetricCard Label="Resolved" Value="@ResolvedCount.ToString()" Accent="success" />
+            </div>
+
+            <div class="glass-elevated p-4 mb-6 flex flex-wrap gap-3 items-center">
+                <div class="flex flex-wrap gap-1">
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "all" ? "active" : "")" @onclick='() => { statusFilter = "all"; }'>All</button>
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "Pending" ? "active" : "")" @onclick='() => { statusFilter = "Pending"; }'>Pending</button>
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "Assigned" ? "active" : "")" @onclick='() => { statusFilter = "Assigned"; }'>Assigned</button>
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "InProgress" ? "active" : "")" @onclick='() => { statusFilter = "InProgress"; }'>In Progress</button>
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "Resolved" ? "active" : "")" @onclick='() => { statusFilter = "Resolved"; }'>Resolved</button>
+                    <button class="btn btn-secondary btn-sm @(statusFilter == "Closed" ? "active" : "")" @onclick='() => { statusFilter = "Closed"; }'>Closed</button>
+                </div>
+                <div class="flex-1"></div>
+                <select class="btn btn-secondary btn-sm" @bind="severityFilter" style="min-width: 120px;">
+                    <option value="all">All Severities</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                </select>
+                <input type="text" class="btn btn-secondary btn-sm" @bind="searchQuery" placeholder="Search by title..." style="min-width: 180px; text-align: left;" />
+            </div>
+
+            <GlassCard Class="rounded-xl overflow-hidden">
+                <div class="table-responsive">
+                    @if (!FilteredIncidents.Any())
+                    {
+                        <EmptyState Icon="📋" Title="No Incidents Found" Message="@GetEmptyMessage()" />
+                    }
+                    else
+                    {
+                        <table class="w-full">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--glass-border); background: var(--glass);">
+                                    <th class="text-left p-4 font-medium text-sm text-muted">#</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Title</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Category</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Status</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Severity</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Reported</th>
+                                    <th class="text-left p-4 font-medium text-sm text-muted">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var incident in FilteredIncidents)
+                                {
+                                    <tr style="border-bottom: 1px solid var(--glass-border);" class="hover:bg-white/[0.02] transition-colors">
+                                        <td class="p-4">
+                                            <span class="font-mono text-xs text-muted">@incident.IncidentNumber</span>
+                                        </td>
+                                        <td class="p-4 font-medium">@incident.Title</td>
+                                        <td class="p-4">
+                                            <span class="text-sm">@incident.CategoryName</span>
+                                        </td>
+                                        <td class="p-4">
+                                            <span class="badge @GetStatusBadge(incident.Status)">@GetStatusLabel(incident.Status)</span>
+                                        </td>
+                                        <td class="p-4">
+                                            <span style="color: @GetSeverityColor(incident.Severity); font-weight: 500; font-size: 0.875rem;">@GetSeverityLabel(incident.Severity)</span>
+                                        </td>
+                                        <td class="p-4 text-sm text-muted">@FormatDateTime(incident.ReportedAt)</td>
+                                        <td class="p-4">
+                                            <div class="flex gap-2">
+                                                <button class="btn btn-primary btn-sm" @onclick='() => ViewIncident(incident.IncidentId)'>View</button>
+                                                <button class="btn btn-secondary btn-sm" @onclick='() => OpenUpdateStatus(incident)'>Update Status</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </GlassCard>
+        }
+    </div>
+</div>
+
+@if (updatingIncident is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);"
+         @onclick='() => CloseUpdateStatus()'>
+        <div class="glass-elevated w-full max-w-lg rounded-2xl" style="border: 1px solid var(--glass-border);" @onclick:stopPropagation>
+            <div class="p-6 border-b" style="border-color: var(--glass-border);">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-display text-xl font-bold">Update Status</h3>
+                        <p class="text-sm text-muted mt-1">@updatingIncident.Title</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm w-10 h-10 p-0 flex items-center justify-center" @onclick='() => CloseUpdateStatus()'>✕</button>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <p class="text-xs text-muted mb-2">Current Status</p>
+                    <span class="badge @GetStatusBadge(updatingIncident.Status)">@GetStatusLabel(updatingIncident.Status)</span>
+                </div>
+                <div>
+                    <label class="text-xs text-muted block mb-2">New Status</label>
+                    <select class="w-full p-3 rounded-lg" style="background: var(--glass); border: 1px solid var(--glass-border); color: inherit;" @bind="selectedNewStatus">
+                        @foreach (IncidentStatus s in Enum.GetValues<IncidentStatus>())
+                        {
+                            <option value="@s">@GetStatusLabel(s)</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-muted block mb-2">Resolution Notes (optional)</label>
+                    <textarea class="w-full p-3 rounded-lg" style="background: var(--glass); border: 1px solid var(--glass-border); color: inherit; min-height: 80px; resize: vertical;" @bind="resolutionNotes" placeholder="Add notes for resolution..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button class="btn btn-secondary" @onclick='() => CloseUpdateStatus()' disabled="@isUpdating">Cancel</button>
+                    <button class="btn btn-primary" @onclick='() => SubmitStatusUpdate()' disabled="@isUpdating">
+                        @(isUpdating ? "Updating..." : "Update Status")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string statusFilter = "all";
+    private string severityFilter = "all";
+    private string searchQuery = "";
+    private List<IncidentListDto> allIncidents = [];
+    private IncidentListDto? updatingIncident;
+    private IncidentStatus? selectedNewStatus;
+    private string? resolutionNotes;
+    private bool isUpdating;
+    private bool isLoading = true;
+
+    private int PendingCount, AssignedCount, InProgressCount, ResolvedCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allIncidents = await IncidentService.GetAllIncidentsAsync();
+            PendingCount = allIncidents.Count(i => i.Status == IncidentStatus.Pending);
+            AssignedCount = allIncidents.Count(i => i.Status == IncidentStatus.Assigned);
+            InProgressCount = allIncidents.Count(i => i.Status == IncidentStatus.InProgress);
+            ResolvedCount = allIncidents.Count(i => i.Status == IncidentStatus.Resolved);
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private List<IncidentListDto> FilteredIncidents
+    {
+        get
+        {
+            var q = allIncidents.AsEnumerable();
+            if (statusFilter != "all" && Enum.TryParse<IncidentStatus>(statusFilter, true, out var s))
+                q = q.Where(i => i.Status == s);
+            if (severityFilter != "all" && Enum.TryParse<SeverityLevel>(severityFilter, true, out var sv))
+                q = q.Where(i => i.Severity == sv);
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+                q = q.Where(i => i.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+            return q.OrderByDescending(i => i.ReportedAt).ToList();
+        }
+    }
+
+    private string GetStatusBadge(IncidentStatus s) => s switch
+    {
+        IncidentStatus.Pending => "badge-secondary",
+        IncidentStatus.Assigned => "badge-info",
+        IncidentStatus.InProgress => "badge-warning",
+        IncidentStatus.Resolved => "badge-success",
+        IncidentStatus.Closed => "badge-muted",
+        _ => "badge-secondary"
+    };
+
+    private string GetStatusLabel(IncidentStatus s) => s switch
+    {
+        IncidentStatus.Pending => "Pending",
+        IncidentStatus.Assigned => "Assigned",
+        IncidentStatus.InProgress => "In Progress",
+        IncidentStatus.Resolved => "Resolved",
+        IncidentStatus.Closed => "Closed",
+        _ => "Unknown"
+    };
+
+    private string GetSeverityColor(SeverityLevel s) => s switch
+    {
+        SeverityLevel.Low => "var(--success)",
+        SeverityLevel.Medium => "var(--warning)",
+        SeverityLevel.High => "var(--danger)",
+        SeverityLevel.Critical => "#FF3B5C",
+        _ => "var(--text-muted)"
+    };
+
+    private string GetSeverityLabel(SeverityLevel s) => s switch
+    {
+        SeverityLevel.Low => "Low",
+        SeverityLevel.Medium => "Medium",
+        SeverityLevel.High => "High",
+        SeverityLevel.Critical => "Critical",
+        _ => "Unknown"
+    };
+
+    private string FormatDateTime(DateTime dt) => dt.ToLocalTime().ToString("MMM dd, HH:mm");
+
+    private void ViewIncident(Guid incidentId)
+    {
+        // Navigate to a detail page if available; otherwise no-op
+    }
+
+    private void OpenUpdateStatus(IncidentListDto inc)
+    {
+        updatingIncident = inc;
+        selectedNewStatus = inc.Status;
+        resolutionNotes = null;
+    }
+
+    private void CloseUpdateStatus()
+    {
+        updatingIncident = null;
+        selectedNewStatus = null;
+        resolutionNotes = null;
+    }
+
+    private async Task SubmitStatusUpdate()
+    {
+        if (updatingIncident == null || !selectedNewStatus.HasValue) return;
+        isUpdating = true;
+        try
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? userId = userIdClaim is not null && Guid.TryParse(userIdClaim, out var uid) ? uid : null;
+            await IncidentService.UpdateStatusAsync(updatingIncident.IncidentId, selectedNewStatus.Value, userId);
+            allIncidents = await IncidentService.GetAllIncidentsAsync();
+            RecalculateCounts();
+            CloseUpdateStatus();
+        }
+        catch { }
+        finally { isUpdating = false; }
+    }
+
+    private async Task RefreshData()
+    {
+        isLoading = true;
+        try
+        {
+            allIncidents = await IncidentService.GetAllIncidentsAsync();
+            RecalculateCounts();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private void RecalculateCounts()
+    {
+        PendingCount = allIncidents.Count(i => i.Status == IncidentStatus.Pending);
+        AssignedCount = allIncidents.Count(i => i.Status == IncidentStatus.Assigned);
+        InProgressCount = allIncidents.Count(i => i.Status == IncidentStatus.InProgress);
+        ResolvedCount = allIncidents.Count(i => i.Status == IncidentStatus.Resolved);
+    }
+
+    private string GetEmptyMessage() => statusFilter switch
+    {
+        "all" => "No incidents reported yet.",
+        "Pending" => "No pending incidents.",
+        "Assigned" => "No assigned incidents.",
+        "InProgress" => "No in-progress incidents.",
+        "Resolved" => "No resolved incidents.",
+        "Closed" => "No closed incidents.",
+        _ => "No incidents match your filters."
+    };
+}

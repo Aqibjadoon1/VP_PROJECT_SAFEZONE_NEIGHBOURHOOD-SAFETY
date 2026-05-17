@@ -1,0 +1,270 @@
+@page "/authority/dispatch"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject IIncidentService IncidentService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="ambient-glow-2"></div>
+<div class="pb-8 px-4 max-w-7xl mx-auto">
+    <PageHeader Title="Dispatch Map" Subtitle="Real-time incident monitoring & resource dispatch" />
+
+    <div class="glass-elevated p-4 mb-6 flex flex-wrap items-center gap-3">
+        <button class="filter-tab @(statusFilter == "all" ? "active" : "")" @onclick='() => statusFilter = "all"'>All</button>
+        <button class="filter-tab @(statusFilter == "pending" ? "active" : "")" @onclick='() => statusFilter = "pending"'>Pending</button>
+        <button class="filter-tab @(statusFilter == "assigned" ? "active" : "")" @onclick='() => statusFilter = "assigned"'>Assigned</button>
+        <button class="filter-tab @(statusFilter == "inprogress" ? "active" : "")" @onclick='() => statusFilter = "inprogress"'>In Progress</button>
+        <button class="filter-tab @(statusFilter == "resolved" ? "active" : "")" @onclick='() => statusFilter = "resolved"'>Resolved</button>
+
+        <span class="text-muted mx-2">|</span>
+
+        <select class="filter-tab px-3 py-1" @bind='severityFilter'>
+            <option value="all">All Severities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+        </select>
+
+        <span class="flex-1"></span>
+
+        <button class="btn btn-sm @(autoRefresh ? "btn-primary" : "btn-secondary")" @onclick='() => autoRefresh = !autoRefresh'>
+            @(autoRefresh ? "Auto-Refresh On" : "Auto-Refresh Off")
+        </button>
+        <button class="btn btn-primary btn-sm" @onclick='RefreshNow'>Refresh Now</button>
+    </div>
+
+    <div class="flex gap-6">
+        <div class="flex-1" style="min-width: 0;">
+            <GlassCard Title="Live Map" Class="p-0 overflow-hidden" Style="border-radius: 16px;">
+                <div id="@MapId" class="authority-dispatch-map">
+                    @if (isLoading)
+                    {
+                        <div class="weather-map-overlay">
+                            <div class="spinner"></div>
+                            <p>Loading dispatch map...</p>
+                        </div>
+                    }
+                </div>
+            </GlassCard>
+        </div>
+
+        <div class="w-[30%] min-w-[300px]">
+            <GlassCard Title="Incidents" Class="p-4" Style="border-radius: 16px;">
+                @if (isLoading)
+                {
+                    <div class="space-y-3">
+                        <LoadingSkeleton Type="card" />
+                        <LoadingSkeleton Type="card" />
+                        <LoadingSkeleton Type="card" />
+                    </div>
+                }
+                else if (!FilteredIncidents.Any())
+                {
+                    <EmptyState Icon="📭" Title="No Incidents" Message="No incidents match the current filters" />
+                }
+                else
+                {
+                    <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                        @foreach (var inc in FilteredIncidents)
+                        {
+                            <div class="p-4 rounded-lg cursor-pointer transition-colors" style="background: var(--glass); border: 1px solid transparent;" @onclick='() => SelectIncident(inc)'>
+                                <div class="flex items-start gap-3">
+                                    <span class="mt-1 w-3 h-3 rounded-full flex-shrink-0" style="background: @GetSeverityColor(inc.Severity);"></span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-xs font-mono text-muted">@inc.IncidentNumber</span>
+                                            <span class="badge badge-@GetStatusBadge(inc.Status) text-xs">@GetStatusLabel(inc.Status)</span>
+                                        </div>
+                                        <p class="font-medium text-sm truncate">@inc.Title</p>
+                                        <p class="text-xs text-muted truncate mt-0.5">@inc.Address</p>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </GlassCard>
+        </div>
+    </div>
+</div>
+
+@if (selectedIncident is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);"
+         @onclick='() => CloseDetail()'>
+        <div class="glass-elevated w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+             style="border: 1px solid var(--glass-border);"
+             @onclick:stopPropagation>
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h3 class="font-display text-xl font-bold">@selectedIncident.Title</h3>
+                    <p class="text-sm text-muted mt-1">@selectedIncident.IncidentNumber</p>
+                </div>
+                <button class="btn btn-secondary btn-icon" @onclick='() => CloseDetail()'>✕</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <p class="text-xs text-muted mb-1">Status</p>
+                    <span class="badge badge-@GetStatusBadge(selectedIncident.Status)">@GetStatusLabel(selectedIncident.Status)</span>
+                </div>
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <p class="text-xs text-muted mb-1">Severity</p>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full" style="background: @GetSeverityColor(selectedIncident.Severity);"></span>
+                        <span class="font-medium">@selectedIncident.Severity</span>
+                    </div>
+                </div>
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <p class="text-xs text-muted mb-1">Reported Time</p>
+                    <p class="font-medium text-sm">@selectedIncident.ReportedAt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</p>
+                </div>
+                <div class="p-4 rounded-lg" style="background: var(--glass);">
+                    <p class="text-xs text-muted mb-1">Location</p>
+                    <p class="font-medium text-sm truncate">@(string.IsNullOrEmpty(selectedIncident.Address) ? "N/A" : selectedIncident.Address)</p>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(selectedIncident.Description))
+            {
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-2">Description</h4>
+                    <p class="text-sm whitespace-pre-wrap">@selectedIncident.Description</p>
+                </div>
+            }
+
+            <div class="flex flex-wrap gap-3 pt-4 border-t" style="border-color: var(--glass-border);">
+                <button class="btn btn-primary">Assign to Unit</button>
+                <button class="btn btn-secondary" @onclick='() => NavigateToFieldReports()'>Update Status</button>
+                <button class="btn btn-secondary">View Details</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const string MapId = "dispatch-map";
+    private string statusFilter = "all";
+    private string severityFilter = "all";
+    private bool autoRefresh;
+    private bool isMapReady;
+    private List<MapIncidentDto> mapIncidents = [];
+    private List<IncidentListDto> allIncidents = [];
+    private IncidentListDto? selectedIncident;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allIncidents = await IncidentService.GetAllIncidentsAsync();
+            mapIncidents = await IncidentService.GetIncidentsForMapAsync();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isMapReady = true;
+            await RenderDispatchMapAsync();
+        }
+    }
+
+    private async Task RefreshNow()
+    {
+        isLoading = true;
+        try
+        {
+            allIncidents = await IncidentService.GetAllIncidentsAsync();
+            mapIncidents = await IncidentService.GetIncidentsForMapAsync();
+        }
+        catch { }
+        finally { isLoading = false; }
+
+        await RenderDispatchMapAsync();
+    }
+
+    private async Task RenderDispatchMapAsync()
+    {
+        if (!isMapReady) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("safezoneMap.init", MapId, new
+            {
+                center = new { lat = 33.6844, lng = 73.0479 },
+                zoom = 12,
+                zoomControl = true,
+                scrollWheelZoom = true
+            });
+            await JS.InvokeVoidAsync("safezoneMap.addIncidentMarkers", MapId, mapIncidents);
+            if (mapIncidents.Count > 0)
+            {
+                await JS.InvokeVoidAsync("safezoneMap.fitBounds", MapId, mapIncidents);
+            }
+            await JS.InvokeVoidAsync("safezoneMap.invalidate", MapId);
+        }
+        catch { }
+    }
+
+    private List<IncidentListDto> FilteredIncidents
+    {
+        get
+        {
+            var q = allIncidents.AsEnumerable();
+            if (statusFilter != "all" && Enum.TryParse<IncidentStatus>(statusFilter, true, out var s))
+                q = q.Where(i => i.Status == s);
+            if (severityFilter != "all" && Enum.TryParse<SeverityLevel>(severityFilter, true, out var sv))
+                q = q.Where(i => i.Severity == sv);
+            return q.OrderByDescending(i => i.ReportedAt).ToList();
+        }
+    }
+
+    private string GetSeverityColor(SeverityLevel s) => s switch
+    {
+        SeverityLevel.Low => "#00FF88",
+        SeverityLevel.Medium => "#FFB800",
+        SeverityLevel.High => "#FF6B35",
+        SeverityLevel.Critical => "#FF3B5C",
+        _ => "#666"
+    };
+
+    private string GetStatusBadge(IncidentStatus status) => status switch
+    {
+        IncidentStatus.Pending => "warning",
+        IncidentStatus.Assigned => "primary",
+        IncidentStatus.InProgress => "purple",
+        IncidentStatus.Resolved => "success",
+        IncidentStatus.Closed => "secondary",
+        _ => "secondary"
+    };
+
+    private string GetStatusLabel(IncidentStatus status) => status switch
+    {
+        IncidentStatus.Pending => "Pending",
+        IncidentStatus.Assigned => "Assigned",
+        IncidentStatus.InProgress => "In Progress",
+        IncidentStatus.Resolved => "Resolved",
+        IncidentStatus.Closed => "Closed",
+        _ => "Unknown"
+    };
+
+    private void SelectIncident(IncidentListDto inc) => selectedIncident = inc;
+    private void CloseDetail() => selectedIncident = null;
+    private void NavigateToFieldReports() => Navigation.NavigateTo("/authority/field-reports");
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("safezoneMap.dispose", MapId);
+        }
+        catch { }
+    }
+}

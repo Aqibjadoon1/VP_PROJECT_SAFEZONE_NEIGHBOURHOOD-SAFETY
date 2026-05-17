@@ -1,0 +1,110 @@
+@page "/user/settings"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject UserManager<User> UserManager
+@inject AuthenticationStateProvider AuthState
+@inject ToastService ToastSvc
+
+<PageHeader Title="Settings"
+            Subtitle="Configure your notification preferences and privacy options" />
+
+<div class="max-w-2xl space-y-6">
+    <GlassCard Title="Notification Preferences">
+        @if (user != null)
+        {
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--glass);">
+                    <div>
+                        <p class="font-medium">Push Notifications</p>
+                        <p class="text-sm text-muted">Receive real-time safety alerts</p>
+                    </div>
+                    <button class="btn btn-sm @(user.PushNotificationsEnabled ? "btn-primary" : "btn-secondary")"
+                            @onclick="TogglePushNotifications">
+                        @(user.PushNotificationsEnabled ? "Enabled" : "Disabled")
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--glass);">
+                    <div>
+                        <p class="font-medium">Anonymous Reporting</p>
+                        <p class="text-sm text-muted">Hide your identity in incident reports</p>
+                    </div>
+                    <button class="btn btn-sm @(user.IsAnonymous ? "btn-primary" : "btn-secondary")"
+                            @onclick="ToggleAnonymous">
+                        @(user.IsAnonymous ? "Enabled" : "Disabled")
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <LoadingSkeleton Type="text" />
+            <LoadingSkeleton Type="text" />
+        }
+    </GlassCard>
+
+    <GlassCard Title="Proximity & Location">
+        @if (user != null)
+        {
+            <div class="space-y-4">
+                <div>
+                    <label>Alert Radius (km)</label>
+                    <input type="number" @bind="user.ProximityRadiusKm" min="1" max="50" />
+                    <p class="text-xs text-muted mt-1">Receive alerts for incidents within this radius</p>
+                </div>
+            </div>
+
+            <div class="mt-4 flex gap-3">
+                <button class="btn btn-primary" @onclick="SaveSettings">Save Settings</button>
+            </div>
+        }
+        else
+        {
+            <LoadingSkeleton Type="page" />
+        }
+    </GlassCard>
+</div>
+
+@code {
+    private User? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId is not null)
+        {
+            user = await UserManager.FindByIdAsync(userId);
+        }
+    }
+
+    private async Task TogglePushNotifications()
+    {
+        if (user is null) return;
+        user.PushNotificationsEnabled = !user.PushNotificationsEnabled;
+        await UserManager.UpdateAsync(user);
+        ToastSvc.ShowSuccess($"Push notifications {(user.PushNotificationsEnabled ? "enabled" : "disabled")}");
+    }
+
+    private async Task ToggleAnonymous()
+    {
+        if (user is null) return;
+        user.IsAnonymous = !user.IsAnonymous;
+        await UserManager.UpdateAsync(user);
+        ToastSvc.ShowSuccess($"Anonymous reporting {(user.IsAnonymous ? "enabled" : "disabled")}");
+    }
+
+    private async Task SaveSettings()
+    {
+        if (user is null) return;
+        var result = await UserManager.UpdateAsync(user);
+        if (result.Succeeded)
+        {
+            ToastSvc.ShowSuccess("Settings saved");
+        }
+        else
+        {
+            ToastSvc.ShowError("Failed to save settings");
+        }
+    }
+}

@@ -1,0 +1,29 @@
+<span class="status-chip @GetStatusClass()">
+    <span class="dot"></span>
+    @Status switch
+    {
+        nameof(IncidentStatus.Pending) => "Pending",
+        nameof(IncidentStatus.Assigned) => "Assigned",
+        nameof(IncidentStatus.InProgress) => "In Progress",
+        nameof(IncidentStatus.Resolved) => "Resolved",
+        nameof(IncidentStatus.Closed) => "Closed",
+        _ => Status
+    }
+</span>
+
+@code {
+    [Parameter] public string Status { get; set; } = "";
+
+    private string GetStatusClass()
+    {
+        return Status switch
+        {
+            nameof(IncidentStatus.Pending) => "pending",
+            nameof(IncidentStatus.Assigned) => "assigned",
+            nameof(IncidentStatus.InProgress) => "inprogress",
+            nameof(IncidentStatus.Resolved) => "resolved",
+            nameof(IncidentStatus.Closed) => "closed",
+            _ => "pending"
+        };
+    }
+}

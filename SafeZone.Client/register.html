@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - SafeZone</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/global.css">
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 page-enter">
+    <!-- Ambient Glow Elements -->
+    <div class="ambient-glow-2"></div>
+
+    <!-- Main Container -->
+    <div class="relative z-10 w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <a href="index.html" class="inline-block">
+                <h1 class="font-display text-4xl font-extrabold" style="color: var(--primary); letter-spacing: -1px;">SafeZone</h1>
+            </a>
+            <p class="mt-2" style="color: var(--text-2);">Create your account</p>
+        </div>
+
+        <!-- Register Card -->
+        <div class="glass-elevated p-8">
+            <h2 class="font-display text-2xl font-bold mb-2">Create Account</h2>
+            <p class="mb-8" style="color: var(--text-2);">Join SafeZone and help keep your neighborhood safe</p>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="space-y-6">
+                <!-- Full Name -->
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input 
+                        type="text" 
+                        id="fullName" 
+                        name="fullName" 
+                        placeholder="John Doe"
+                        autocomplete="name"
+                        required
+                    >
+                </div>
+
+                <!-- Phone Number -->
+                <div class="form-group">
+                    <label for="phoneNumber">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phoneNumber" 
+                        name="phoneNumber" 
+                        placeholder="+923001234567"
+                        autocomplete="tel"
+                        required
+                    >
+                    <p class="text-muted mt-1" style="font-size: 0.8rem;">Used for login and emergency alerts</p>
+                </div>
+
+                <!-- Role Selection -->
+                <div class="form-group">
+                    <label>Account Type</label>
+                    <div class="flex gap-3 mt-2">
+                        <label class="flex-1">
+                            <input type="radio" name="role" value="Resident" checked class="hidden">
+                            <div class="role-option p-4 text-center cursor-pointer transition-all glass" data-role="Resident">
+                                <div class="text-2xl mb-2">🏠</div>
+                                <div class="font-semibold">Resident</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Report incidents, view map</div>
+                            </div>
+                        </label>
+                        <label class="flex-1">
+                            <input type="radio" name="role" value="Authority" class="hidden">
+                            <div class="role-option p-4 text-center cursor-pointer transition-all glass" data-role="Authority">
+                                <div class="text-2xl mb-2">🚔</div>
+                                <div class="font-semibold">Authority</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Police/Rescue response</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                        required
+                    >
+                    <p class="text-muted mt-1" style="font-size: 0.8rem;">Minimum 6 characters</p>
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirmPassword" 
+                        name="confirmPassword" 
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                        required
+                    >
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="hidden p-4 rounded-lg" style="background: var(--danger-dim); border: 1px solid var(--severity-critical-border);">
+                    <p id="errorText" style="color: var(--danger);"></p>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn" class="btn btn-primary w-full">
+                    <span id="btnText">Create Account</span>
+                    <span id="btnSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="flex items-center my-6">
+                <div class="flex-1" style="height: 1px; background: var(--glass-border);"></div>
+                <span class="px-4 text-muted" style="font-size: 0.85rem;">or</span>
+                <div class="flex-1" style="height: 1px; background: var(--glass-border);"></div>
+            </div>
+
+            <!-- Login Link -->
+            <p class="text-center" style="color: var(--text-2);">
+                Already have an account? 
+                <a href="login.html" class="font-semibold" style="color: var(--primary);">Sign In</a>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center mt-6 text-muted" style="font-size: 0.8rem;">
+            CS-284L Visual Programming Lab • Air University Islamabad
+        </p>
+    </div>
+
+    <!-- JavaScript Utilities -->
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/toast.js"></script>
+
+    <!-- Register Logic -->
+    <script>
+        // Redirect if already authenticated
+        if (window.safezoneAuth.redirectIfAuthenticated()) {
+            // Already redirected
+        }
+
+        // Role selection UI
+        const roleOptions = document.querySelectorAll('.role-option');
+        const roleRadios = document.querySelectorAll('input[name="role"]');
+
+        roleOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                roleOptions.forEach(o => {
+                    o.style.borderColor = '';
+                    o.style.background = '';
+                });
+                this.style.borderColor = 'var(--primary)';
+                this.style.background = 'var(--primary-dim)';
+            });
+        });
+
+        // Initialize first as selected
+        roleOptions[0].style.borderColor = 'var(--primary)';
+        roleOptions[0].style.background = 'var(--primary-dim)';
+
+        const registerForm = document.getElementById('registerForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        function setLoading(loading) {
+            submitBtn.disabled = loading;
+            btnText.textContent = loading ? 'Creating Account...' : 'Create Account';
+            btnSpinner.classList.toggle('hidden', !loading);
+        }
+
+        registerForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            hideError();
+
+            const fullName = document.getElementById('fullName').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const selectedRole = document.querySelector('input[name="role"]:checked')?.value || 'Resident';
+
+            // Validation
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters.');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showError('Passwords do not match.');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const result = await window.safezoneApi.auth.register({
+                    fullName,
+                    phoneNumber,
+                    password,
+                    confirmPassword,
+                    role: selectedRole === 'Resident' ? 0 : 
+                          selectedRole === 'Authority' ? 1 : 2
+                });
+
+                if (result.success) {
+                    // Auto-login after successful registration
+                    if (result.token) {
+                        window.safezoneAuth.login(
+                            result.token,
+                            result.refreshToken,
+                            result.expiresAt,
+                            result.user
+                        );
+                    }
+
+                    window.safezoneToast.success('Account created successfully!');
+
+                    setTimeout(() => {
+                        window.location.href = result.token ? 
+                            window.safezoneAuth.getDashboardUrl() : 'login.html';
+                    }, 800);
+                } else {
+                    showError(result.message || 'Registration failed.');
+                    window.safezoneToast.error(result.message || 'Registration failed');
+                }
+            } catch (err) {
+                showError(err.message || 'Network error. Please try again.');
+                window.safezoneToast.error(err.message || 'Registration failed');
+            } finally {
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>

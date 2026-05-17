@@ -1,0 +1,51 @@
+@if (Type == "card")
+{
+    <div class="skeleton skeleton-card"></div>
+}
+else if (Type == "text")
+{
+    <div class="skeleton skeleton-text" style="width: @Width"></div>
+}
+else if (Type == "title")
+{
+    <div class="skeleton skeleton-title"></div>
+}
+else if (Type == "avatar")
+{
+    <div class="skeleton skeleton-avatar"></div>
+}
+else if (Type == "page")
+{
+    <div style="padding: 24px;">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-text" style="width: 70%"></div>
+        <div style="margin-top: 24px;">
+            <div class="skeleton skeleton-card"></div>
+        </div>
+        <div style="margin-top: 16px;">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text" style="width: 85%"></div>
+            <div class="skeleton skeleton-text" style="width: 60%"></div>
+        </div>
+    </div>
+}
+else if (Type == "stats")
+{
+    <div class="stats-row">
+        <div class="skeleton skeleton-card" style="height: 100px"></div>
+        <div class="skeleton skeleton-card" style="height: 100px"></div>
+        <div class="skeleton skeleton-card" style="height: 100px"></div>
+        <div class="skeleton skeleton-card" style="height: 100px"></div>
+    </div>
+}
+else
+{
+    <div class="skeleton" style="width: @Width; height: @Height; border-radius: @Radius"></div>
+}
+
+@code {
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string Width { get; set; } = "100%";
+    [Parameter] public string Height { get; set; } = "16px";
+    [Parameter] public string Radius { get; set; } = "var(--radius-md)";
+}

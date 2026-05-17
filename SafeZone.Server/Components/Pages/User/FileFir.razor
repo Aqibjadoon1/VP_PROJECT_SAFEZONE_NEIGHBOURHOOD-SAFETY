@@ -1,0 +1,481 @@
+@page "/user/file-fir"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+@inject IFirService FirService
+@inject IIncidentService IncidentService
+
+<style>
+    .step-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .step-indicator.active {
+        background: var(--primary);
+        color: #0A0A14;
+    }
+    .step-indicator.completed {
+        background: var(--success-dim);
+        color: var(--success);
+    }
+    .step-indicator.inactive {
+        background: var(--glass);
+        color: var(--text-muted);
+    }
+    .step-connector {
+        flex: 1;
+        height: 2px;
+        background: var(--glass-border);
+        margin: 0 8px;
+    }
+    .step-connector.completed {
+        background: var(--primary);
+    }
+    .step-content {
+        display: none;
+    }
+    .step-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    #fir-map {
+        border-radius: 12px;
+        border: 2px solid var(--glass-border);
+    }
+    .form-section {
+        background: var(--glass);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .declaration-box {
+        background: var(--info-dim);
+        border: 1px solid var(--info);
+        border-radius: 12px;
+        padding: 20px;
+    }
+</style>
+
+<div class="min-h-screen page-enter">
+    <div class="ambient-glow-2"></div>
+
+    <div class="pt-24 pb-8 px-4 max-w-4xl mx-auto">
+        <div class="mb-8 text-center">
+            <PageHeader Title="File FIR Report" Subtitle="First Information Report - Official Police Document" />
+        </div>
+
+        @if (!ShowSuccess)
+        {
+            <div class="flex items-center justify-center mb-8">
+                <div class="step-indicator @(CurrentStep > 1 ? "completed" : CurrentStep == 1 ? "active" : "inactive")">
+                    @if (CurrentStep > 1) { <text>&#10003;</text> } else { <text>1</text> }
+                </div>
+                <div class="step-connector @(CurrentStep > 1 ? "completed" : "")"></div>
+                <div class="step-indicator @(CurrentStep > 2 ? "completed" : CurrentStep == 2 ? "active" : "inactive")">
+                    @if (CurrentStep > 2) { <text>&#10003;</text> } else { <text>2</text> }
+                </div>
+                <div class="step-connector @(CurrentStep > 2 ? "completed" : "")"></div>
+                <div class="step-indicator @(CurrentStep > 3 ? "completed" : CurrentStep == 3 ? "active" : "inactive")">
+                    @if (CurrentStep > 3) { <text>&#10003;</text> } else { <text>3</text> }
+                </div>
+                <div class="step-connector @(CurrentStep > 3 ? "completed" : "")"></div>
+                <div class="step-indicator @(CurrentStep > 4 ? "completed" : CurrentStep == 4 ? "active" : "inactive")">
+                    @if (CurrentStep > 4) { <text>&#10003;</text> } else { <text>4</text> }
+                </div>
+            </div>
+            <div class="flex justify-between mb-8 px-2 text-xs text-center">
+                <div class="w-24" style="color: @(CurrentStep == 1 ? "var(--primary)" : "var(--text-3)");">Complainant Info</div>
+                <div class="w-24" style="color: @(CurrentStep == 2 ? "var(--primary)" : "var(--text-3)");">Incident Details</div>
+                <div class="w-24" style="color: @(CurrentStep == 3 ? "var(--primary)" : "var(--text-3)");">Accused Info</div>
+                <div class="w-24" style="color: @(CurrentStep == 4 ? "var(--primary)" : "var(--text-3)");">Review</div>
+            </div>
+
+            <div class="glass-elevated p-8">
+                <div class="step-content @(CurrentStep == 1 ? "active" : "")">
+                    <h3 class="font-display text-xl font-bold mb-6">Complainant Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Full Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., Muhammad Ali Khan" @bind="Model.ComplainantName" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Father's/Husband's Name</label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., Khan Muhammad" @bind="Model.ComplainantFatherName" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">CNIC Number <span style="color: var(--danger);">*</span></label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., 35201-1234567-8" @bind="Model.ComplainantCNIC" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date of Birth</label>
+                            <input type="date" class="form-input w-full" @bind="Model.ComplainantDOB" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Phone Number</label>
+                            <input type="tel" class="form-input w-full" placeholder="e.g., +92300-1234567" @bind="Model.ComplainantPhone" @bind:event="oninput" />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-2">Complete Address <span style="color: var(--danger);">*</span></label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., House # 123, Street # 45, Sector F-7, Islamabad" @bind="Model.ComplainantAddress" @bind:event="oninput" />
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <label class="block text-sm font-medium mb-3">Link to Existing Incident Report (Optional)</label>
+                        <select class="form-input w-full" @bind="Model.IncidentId">
+                            <option value="">-- Select an incident (if applicable) --</option>
+                            @if (MyIncidents != null)
+                            {
+                                @foreach (var inc in MyIncidents)
+                                {
+                                    <option value="@inc.IncidentId">@inc.IncidentNumber - @inc.Title</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="flex justify-end mt-8">
+                        <button type="button" class="btn btn-primary" disabled="@(!CanGoStep2)" @onclick="GoToStep2">Next: Incident Details &rarr;</button>
+                    </div>
+                </div>
+
+                <div class="step-content @(CurrentStep == 2 ? "active" : "")">
+                    <h3 class="font-display text-xl font-bold mb-6">Incident Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Date & Time of Incident <span style="color: var(--danger);">*</span></label>
+                            <input type="datetime-local" class="form-input w-full" @bind="Model.IncidentDateTime" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Place of Incident <span style="color: var(--danger);">*</span></label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., Near Sector F-7 Markaz" @bind="Model.IncidentPlace" @bind:event="oninput" />
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="text-sm font-medium">Mark Location on Map (Optional)</label>
+                            <button type="button" class="btn btn-secondary btn-sm" @onclick="UseMyLocation">📍 Use My Location</button>
+                        </div>
+                        <div id="fir-map" style="width: 100%; height: 250px;"></div>
+                        <p class="text-xs text-muted mt-2">Click on the map to select precise location</p>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Detailed Narrative of Incident <span style="color: var(--danger);">*</span></label>
+                        <textarea class="form-input w-full" rows="6" placeholder="Describe what happened in chronological order. Include:
+1. What happened?
+2. How did it happen?
+3. Who was involved?
+4. Any witnesses?
+5. What was stolen/damaged?" @bind="Model.IncidentNarrative" @bind:event="oninput"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Property Lost/Stolen (if any)</label>
+                            <input type="text" class="form-input w-full" placeholder="e.g., Mobile Phone, Wallet, Car" @bind="Model.PropertyLost" @bind:event="oninput" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Estimated Loss (PKR)</label>
+                            <input type="number" class="form-input w-full" placeholder="e.g., 50000" min="0" @bind="Model.EstimatedLoss" />
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Witness Details (if any)</label>
+                        <textarea class="form-input w-full" rows="3" placeholder="Names, contact numbers, and statements of any witnesses" @bind="Model.WitnessDetails" @bind:event="oninput"></textarea>
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="GoToStep1">&larr; Back</button>
+                        <button type="button" class="btn btn-primary" disabled="@(!CanGoStep3)" @onclick="GoToStep3">Next: Accused Info &rarr;</button>
+                    </div>
+                </div>
+
+                <div class="step-content @(CurrentStep == 3 ? "active" : "")">
+                    <h3 class="font-display text-xl font-bold mb-6">Accused / Suspect Information</h3>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-3">Do you know the accused?</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="accusedKnown" checked="@(Model.AccusedKnown)" @onchange="() => Model.AccusedKnown = true" />
+                                <span>Yes, I know them</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="accusedKnown" checked="@(!Model.AccusedKnown)" @onchange="() => Model.AccusedKnown = false" />
+                                <span>No, unknown person(s)</span>
+                            </label>
+                        </div>
+                    </div>
+                    @if (Model.AccusedKnown)
+                    {
+                        <div class="form-section">
+                            <h4 class="font-medium mb-4">Known Accused Details</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Full Name</label>
+                                    <input type="text" class="form-input w-full" placeholder="e.g., Unknown Person" @bind="Model.AccusedName" @bind:event="oninput" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">CNIC (if known)</label>
+                                    <input type="text" class="form-input w-full" placeholder="e.g., 35201-1234567-8" @bind="Model.AccusedCNIC" @bind:event="oninput" />
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium mb-2">Address (if known)</label>
+                                    <input type="text" class="form-input w-full" placeholder="e.g., House # 45, Street # 12, Sector G-9" @bind="Model.AccusedAddress" @bind:event="oninput" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Number of Accused Persons</label>
+                            <input type="number" class="form-input w-full" placeholder="e.g., 3" min="1" @bind="Model.NumberOfAccused" />
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Description of Accused / Appearance</label>
+                        <textarea class="form-input w-full" rows="4" placeholder="Physical description: height, build, clothing, facial features, any distinguishing marks, vehicle description if applicable" @bind="Model.AccusedDescription" @bind:event="oninput"></textarea>
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="GoToStep2">&larr; Back</button>
+                        <button type="button" class="btn btn-primary" @onclick="GoToStep4">Next: Review &rarr;</button>
+                    </div>
+                </div>
+
+                <div class="step-content @(CurrentStep == 4 ? "active" : "")">
+                    <h3 class="font-display text-xl font-bold mb-6">Review & Declaration</h3>
+                    <div class="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Complainant</p>
+                            <p class="font-medium">@Model.ComplainantName</p>
+                            <p class="text-sm text-muted">CNIC: @Model.ComplainantCNIC</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Incident Date & Place</p>
+                            <p class="font-medium">@FormatDateTime(Model.IncidentDateTime)</p>
+                            <p class="text-sm text-muted">@Model.IncidentPlace</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Narrative</p>
+                            <p class="font-medium whitespace-pre-wrap text-sm">@Model.IncidentNarrative</p>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.PropertyLost))
+                        {
+                            <div class="p-4 rounded-lg" style="background: var(--glass);">
+                                <p class="text-xs text-muted mb-1">Property Lost</p>
+                                <p class="font-medium">@Model.PropertyLost</p>
+                                @if (Model.EstimatedLoss > 0)
+                                {
+                                    <p class="text-sm text-muted">Est. Loss: PKR @Model.EstimatedLoss.ToString("N0")</p>
+                                }
+                            </div>
+                        }
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Accused Status</p>
+                            <p class="font-medium">@(Model.AccusedKnown ? "Known person(s)" : "Unknown person(s)")</p>
+                            <p class="text-sm text-muted">Number of accused: @(Model.NumberOfAccused > 0 ? Model.NumberOfAccused.ToString() : "1")</p>
+                            @if (!string.IsNullOrEmpty(Model.AccusedDescription))
+                            {
+                                <p class="text-sm text-muted mt-2">@Model.AccusedDescription</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="declaration-box mb-6">
+                        <h4 class="font-medium mb-3" style="color: var(--info);">📋 Solemn Declaration</h4>
+                        <p class="text-sm text-muted mb-4">
+                            I, the undersigned complainant, solemnly declare that the facts stated in this First Information Report are true and correct to the best of my knowledge and belief. I understand that making a false statement to the police is a criminal offense under Section 182 of the Pakistan Penal Code.
+                        </p>
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" class="mt-1" @bind="Model.DeclarationAccepted" />
+                            <span class="text-sm">I have read and understood the above declaration. The information provided is true and accurate.</span>
+                        </label>
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="button" class="btn btn-secondary" @onclick="GoToStep3">&larr; Back</button>
+                        <button type="button" class="btn btn-primary" disabled="@(!Model.DeclarationAccepted || IsSubmitting)" @onclick="HandleSubmit">
+                            @(IsSubmitting ? "Submitting..." : "Submit FIR Report")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="glass-elevated p-8 text-center py-8">
+                <div class="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center" style="background: var(--success-dim);">
+                    <span class="text-4xl">✅</span>
+                </div>
+                <h3 class="font-display text-2xl font-bold mb-3">FIR Submitted Successfully!</h3>
+                <p class="text-muted mb-6">Your First Information Report has been submitted and will be reviewed by authorities.</p>
+                <div class="glass-elevated p-6 max-w-sm mx-auto mb-6 text-left">
+                    <p class="text-xs text-muted mb-1">FIR Number</p>
+                    <p class="font-mono font-bold text-lg" style="color: var(--primary);">@FirNumber</p>
+                </div>
+                <div class="p-4 rounded-lg mb-6" style="background: var(--info-dim); border: 1px solid var(--info);">
+                    <p class="text-sm" style="color: var(--info);">
+                        ℹ️ <strong>Next Steps:</strong> Authorities will review your FIR. You will be notified once it's accepted or if additional information is needed.
+                    </p>
+                </div>
+                <div class="flex justify-center gap-4">
+                    <a href="/user/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+                    <a href="/user/my-firs" class="btn btn-primary">View My FIRs</a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private FileFirModel Model { get; set; } = new();
+    private int CurrentStep = 1;
+    private bool ShowSuccess;
+    private bool IsSubmitting;
+    private string FirNumber = "";
+    private List<IncidentListDto> MyIncidents = new();
+    private Guid UserId;
+
+    private bool CanGoStep2 =>
+        !string.IsNullOrWhiteSpace(Model.ComplainantName) &&
+        !string.IsNullOrWhiteSpace(Model.ComplainantCNIC) &&
+        !string.IsNullOrWhiteSpace(Model.ComplainantAddress);
+
+    private bool CanGoStep3 =>
+        Model.IncidentDateTime.HasValue &&
+        !string.IsNullOrWhiteSpace(Model.IncidentPlace) &&
+        !string.IsNullOrWhiteSpace(Model.IncidentNarrative);
+
+    private class FileFirModel
+    {
+        public string ComplainantName { get; set; } = "";
+        public string ComplainantFatherName { get; set; } = "";
+        public string ComplainantCNIC { get; set; } = "";
+        public DateTime? ComplainantDOB { get; set; }
+        public string ComplainantPhone { get; set; } = "";
+        public string ComplainantAddress { get; set; } = "";
+        public string? IncidentId { get; set; }
+        public DateTime? IncidentDateTime { get; set; }
+        public string IncidentPlace { get; set; } = "";
+        public string IncidentNarrative { get; set; } = "";
+        public string PropertyLost { get; set; } = "";
+        public double EstimatedLoss { get; set; }
+        public string WitnessDetails { get; set; } = "";
+        public bool AccusedKnown { get; set; }
+        public string AccusedName { get; set; } = "";
+        public string AccusedCNIC { get; set; } = "";
+        public string AccusedAddress { get; set; } = "";
+        public int NumberOfAccused { get; set; } = 1;
+        public string AccusedDescription { get; set; } = "";
+        public bool DeclarationAccepted { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User;
+
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is not null && Guid.TryParse(userIdClaim, out var uid))
+        {
+            UserId = uid;
+        }
+
+        try
+        {
+            MyIncidents = await IncidentService.GetMyIncidentsAsync(UserId);
+        }
+        catch
+        {
+            MyIncidents = new();
+        }
+
+        var now = DateTime.Now;
+        Model.IncidentDateTime = now;
+    }
+
+    private void GoToStep1()
+    {
+        CurrentStep = 1;
+    }
+
+    private void GoToStep2()
+    {
+        CurrentStep = 2;
+    }
+
+    private void GoToStep3()
+    {
+        CurrentStep = 3;
+    }
+
+    private void GoToStep4()
+    {
+        CurrentStep = 4;
+    }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+
+        try
+        {
+            var dob = Model.ComplainantDOB;
+
+            var dto = new CreateFirDto
+            {
+                IncidentId = Guid.TryParse(Model.IncidentId, out var incId) ? incId : null,
+                ComplainantName = Model.ComplainantName.Trim(),
+                ComplainantCNIC = Model.ComplainantCNIC.Trim(),
+                ComplainantPhone = string.IsNullOrWhiteSpace(Model.ComplainantPhone) ? null : Model.ComplainantPhone.Trim(),
+                ComplainantAddress = string.IsNullOrWhiteSpace(Model.ComplainantAddress) ? null : Model.ComplainantAddress.Trim(),
+                ComplainantFatherName = string.IsNullOrWhiteSpace(Model.ComplainantFatherName) ? null : Model.ComplainantFatherName.Trim(),
+                ComplainantDateOfBirth = dob,
+                AccusedDescription = string.IsNullOrWhiteSpace(Model.AccusedDescription) ? null : Model.AccusedDescription.Trim(),
+                IncidentNarrative = Model.IncidentNarrative.Trim(),
+                WitnessDetails = string.IsNullOrWhiteSpace(Model.WitnessDetails) ? null : Model.WitnessDetails.Trim(),
+                PropertyLost = string.IsNullOrWhiteSpace(Model.PropertyLost) ? null : Model.PropertyLost.Trim(),
+                EstimatedLoss = Model.EstimatedLoss,
+                IncidentDateTime = Model.IncidentDateTime!.Value.ToUniversalTime(),
+                IncidentPlace = Model.IncidentPlace.Trim(),
+                IncidentLatitude = 33.6844,
+                IncidentLongitude = 73.0479,
+                NumberOfAccused = Model.NumberOfAccused > 0 ? Model.NumberOfAccused : 1,
+                AccusedKnown = Model.AccusedKnown,
+                AccusedName = Model.AccusedKnown && !string.IsNullOrWhiteSpace(Model.AccusedName) ? Model.AccusedName.Trim() : null,
+                AccusedCNIC = Model.AccusedKnown && !string.IsNullOrWhiteSpace(Model.AccusedCNIC) ? Model.AccusedCNIC.Trim() : null,
+                AccusedAddress = Model.AccusedKnown && !string.IsNullOrWhiteSpace(Model.AccusedAddress) ? Model.AccusedAddress.Trim() : null,
+                DeclarationAccepted = true
+            };
+
+            var result = await FirService.CreateFirAsync(dto, UserId);
+            FirNumber = result.FirNumber;
+            ShowSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            Model.DeclarationAccepted = false;
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task UseMyLocation()
+    {
+    }
+
+    private static string FormatDateTime(DateTime? dateTimeValue)
+    {
+        if (dateTimeValue.HasValue)
+        {
+            return dateTimeValue.Value.ToString("f");
+        }
+        return "";
+    }
+}

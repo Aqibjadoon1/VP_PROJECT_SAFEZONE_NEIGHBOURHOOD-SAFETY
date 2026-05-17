@@ -1,0 +1,18 @@
+<div class="empty-state">
+    <div class="empty-icon">@Icon</div>
+    <h3>@Title</h3>
+    <p>@Message</p>
+    @if (Action is not null)
+    {
+        <div>
+            @Action
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "📭";
+    [Parameter] public string Title { get; set; } = "Nothing here yet";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public RenderFragment? Action { get; set; }
+}

@@ -1,0 +1,342 @@
+@page "/user/my-incidents"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject AuthenticationStateProvider AuthState
+@inject IIncidentService IncidentService
+@inject NavigationManager Navigation
+
+<div class="pb-8 px-4 max-w-5xl mx-auto">
+    <PageHeader Title="My Reports" Subtitle="View your incident history">
+        <Actions>
+            <a href="/user/report-incident" class="btn btn-primary">+ New Report</a>
+        </Actions>
+    </PageHeader>
+
+    <div class="filter-bar glass-elevated p-4 mb-6">
+        <button class="filter-tag @(currentFilter == "all" ? "active" : "")" @onclick='() => SetFilter("all")'>All</button>
+        <button class="filter-tag @(currentFilter == "pending" ? "active" : "")" @onclick='() => SetFilter("pending")'>Pending</button>
+        <button class="filter-tag @(currentFilter == "assigned" ? "active" : "")" @onclick='() => SetFilter("assigned")'>Assigned</button>
+        <button class="filter-tag @(currentFilter == "inprogress" ? "active" : "")" @onclick='() => SetFilter("inprogress")'>In Progress</button>
+        <button class="filter-tag @(currentFilter == "resolved" ? "active" : "")" @onclick='() => SetFilter("resolved")'>Resolved</button>
+        <button class="filter-tag @(currentFilter == "closed" ? "active" : "")" @onclick='() => SetFilter("closed")'>Closed</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="space-y-4">
+            <LoadingSkeleton Type="card" />
+            <LoadingSkeleton Type="card" />
+        </div>
+    }
+    else if (errorMessage is not null)
+    {
+        <EmptyState Icon="⚠️" Title="Failed to Load" Message="Could not fetch your incidents. Please try again.">
+            <Action>
+                <button class="btn btn-primary" @onclick="LoadIncidents">Retry</button>
+            </Action>
+        </EmptyState>
+    }
+    else if (!FilteredIncidents.Any())
+    {
+        if (currentFilter == "all")
+        {
+            <EmptyState Icon="📭" Title="@GetEmptyMessage()" Message="Submit your first incident report to get started">
+                <Action>
+                    <a href="/user/report-incident" class="btn btn-primary">+ Report an Incident</a>
+                </Action>
+            </EmptyState>
+        }
+        else
+        {
+            <EmptyState Icon="📭" Title="@GetEmptyMessage()" Message="Try selecting a different status filter" />
+        }
+    }
+    else
+    {
+        <div>
+            @foreach (var incident in FilteredIncidents.Select((inc, idx) => (inc, idx)))
+            {
+                <IncidentCard Incident="@incident.inc" Index="@incident.idx" OnIncidentClick="ShowDetail" />
+            }
+        </div>
+    }
+</div>
+
+@if (showModal)
+{
+    <div class="modal-overlay"
+         @onclick="HandleBackdropClick"
+         @onkeydown="HandleModalKeyDown"
+         tabindex="-1"
+         @ref="modalOverlayRef">
+        <div class="glass-elevated w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl" style="border: 1px solid var(--glass-border);" @onclick:stopPropagation>
+            @if (modalLoading)
+            {
+                <div class="p-6">
+                    <LoadingSkeleton Type="card" />
+                </div>
+            }
+            else if (selectedIncident is not null)
+            {
+                <div class="p-6 border-b" style="border-color: var(--glass-border);">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-display text-xl font-bold">@selectedIncident.Title</h3>
+                            <p class="text-sm text-muted mt-1">@selectedIncident.IncidentNumber • @GetStatusLabel(selectedIncident.Status) • @GetSeverityIcon(selectedIncident.Severity) @GetSeverityLabel(selectedIncident.Severity)</p>
+                        </div>
+                        <button class="btn btn-secondary btn-icon" @onclick="CloseModal">✕</button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Category</p>
+                            <p class="font-medium">@(selectedIncident.CategoryName ?? "Incident")</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Status</p>
+                            <p class="font-medium">@GetStatusLabel(selectedIncident.Status)</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Reported</p>
+                            <p class="font-medium text-sm">@selectedIncident.ReportedAt.ToLocalTime().ToString("MMM dd, yyyy")<br />@selectedIncident.ReportedAt.ToLocalTime().ToString("hh:mm tt")</p>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: var(--glass);">
+                            <p class="text-xs text-muted mb-1">Location</p>
+                            <p class="font-medium text-sm">@(string.IsNullOrEmpty(selectedIncident.Address) ? "N/A" : selectedIncident.Address)</p>
+                            @if (selectedIncident.Latitude != 0 || selectedIncident.Longitude != 0)
+                            {
+                                <p class="text-xs text-muted mt-1">@selectedIncident.Latitude.ToString("F4"), @selectedIncident.Longitude.ToString("F4")</p>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedIncident.Description))
+                    {
+                        <div class="mb-6">
+                            <h4 class="font-semibold mb-2">Description</h4>
+                            <p class="text-sm whitespace-pre-wrap">@selectedIncident.Description</p>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(selectedIncident.AssignedAuthorityName))
+                    {
+                        <div class="mb-6 p-4 rounded-lg" style="background: var(--info-dim); border: 1px solid var(--info);">
+                            <h4 class="font-semibold text-sm mb-1" style="color: var(--info);">Assigned Officer</h4>
+                            <p class="font-medium">@selectedIncident.AssignedAuthorityName</p>
+                        </div>
+                    }
+
+                    @if (selectedIncident.Status == IncidentStatus.Resolved || selectedIncident.Status == IncidentStatus.Closed)
+                    {
+                        <div class="p-4 rounded-lg text-center" style="background: var(--success-dim); border: 1px solid var(--success);">
+                            <p class="font-medium" style="color: var(--success);">This incident has been @(selectedIncident.Status == IncidentStatus.Resolved ? "resolved" : "closed")</p>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="p-6 text-center">
+                    <p class="text-muted">Failed to load incident details.</p>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<IncidentListDto> allIncidents = new();
+    private IncidentResponseDto? selectedIncident;
+    private string currentFilter = "all";
+    private bool isLoading = true;
+    private bool showModal;
+    private bool modalLoading;
+    private string? errorMessage;
+    private ElementReference modalOverlayRef;
+
+    private IEnumerable<IncidentListDto> FilteredIncidents
+    {
+        get
+        {
+            var filtered = currentFilter switch
+            {
+                "pending" => allIncidents.Where(i => i.Status == IncidentStatus.Pending),
+                "assigned" => allIncidents.Where(i => i.Status == IncidentStatus.Assigned),
+                "inprogress" => allIncidents.Where(i => i.Status == IncidentStatus.InProgress),
+                "resolved" => allIncidents.Where(i => i.Status == IncidentStatus.Resolved),
+                "closed" => allIncidents.Where(i => i.Status == IncidentStatus.Closed),
+                _ => allIncidents
+            };
+            return filtered.OrderByDescending(i => i.ReportedAt);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIncidents();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showModal && modalOverlayRef.Context is not null)
+        {
+            await modalOverlayRef.FocusAsync();
+        }
+    }
+
+    private async Task LoadIncidents()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                errorMessage = "Unable to identify current user.";
+                return;
+            }
+            allIncidents = await IncidentService.GetMyIncidentsAsync(userId);
+        }
+        catch
+        {
+            errorMessage = "Failed to load incidents.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ShowDetail(Guid incidentId)
+    {
+        showModal = true;
+        modalLoading = true;
+        selectedIncident = null;
+        try
+        {
+            selectedIncident = await IncidentService.GetIncidentByIdAsync(incidentId);
+        }
+        catch
+        {
+            selectedIncident = null;
+        }
+        finally
+        {
+            modalLoading = false;
+        }
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedIncident = null;
+    }
+
+    private void HandleBackdropClick(MouseEventArgs e)
+    {
+        CloseModal();
+    }
+
+    private void HandleModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" || e.Key == "Esc")
+        {
+            CloseModal();
+        }
+    }
+
+    private void SetFilter(string filter)
+    {
+        currentFilter = filter;
+    }
+
+    private string GetStatusLabel(IncidentStatus status) => status switch
+    {
+        IncidentStatus.Pending => "Pending",
+        IncidentStatus.Assigned => "Assigned",
+        IncidentStatus.InProgress => "In Progress",
+        IncidentStatus.Resolved => "Resolved",
+        IncidentStatus.Closed => "Closed",
+        _ => "Unknown"
+    };
+
+    private string GetStatusBadgeClass(IncidentStatus status) => status switch
+    {
+        IncidentStatus.Pending => "badge-secondary",
+        IncidentStatus.Assigned => "badge-info",
+        IncidentStatus.InProgress => "badge-warning",
+        IncidentStatus.Resolved => "badge-success",
+        IncidentStatus.Closed => "badge-muted",
+        _ => "badge-secondary"
+    };
+
+    private string GetSeverityDotClass(SeverityLevel severity) => severity switch
+    {
+        SeverityLevel.Low => "severity-dot-low",
+        SeverityLevel.Medium => "severity-dot-medium",
+        SeverityLevel.High => "severity-dot-high",
+        SeverityLevel.Critical => "severity-dot-critical",
+        _ => "severity-dot-low"
+    };
+
+    private string GetSeverityIcon(SeverityLevel severity) => severity switch
+    {
+        SeverityLevel.Low => "🟢",
+        SeverityLevel.Medium => "🟡",
+        SeverityLevel.High => "🟠",
+        SeverityLevel.Critical => "🔴",
+        _ => "🟢"
+    };
+
+    private string GetSeverityLabel(SeverityLevel severity) => severity switch
+    {
+        SeverityLevel.Low => "Low",
+        SeverityLevel.Medium => "Medium",
+        SeverityLevel.High => "High",
+        SeverityLevel.Critical => "Critical",
+        _ => "Low"
+    };
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime.ToUniversalTime();
+        var seconds = (int)Math.Abs(span.TotalSeconds);
+
+        if (seconds < 60) return "Just now";
+
+        var intervals = new[]
+        {
+            (Label: "year", Seconds: 31536000),
+            (Label: "month", Seconds: 2592000),
+            (Label: "week", Seconds: 604800),
+            (Label: "day", Seconds: 86400),
+            (Label: "hour", Seconds: 3600),
+            (Label: "minute", Seconds: 60)
+        };
+
+        foreach (var interval in intervals)
+        {
+            var count = seconds / interval.Seconds;
+            if (count >= 1)
+            {
+                return $"{count} {interval.Label}{(count != 1 ? "s" : "")} ago";
+            }
+        }
+
+        return "Just now";
+    }
+
+    private string GetEmptyMessage() => currentFilter switch
+    {
+        "all" => "No incidents reported yet",
+        "pending" => "No pending incidents",
+        "assigned" => "No assigned incidents",
+        "inprogress" => "No incidents in progress",
+        "resolved" => "No resolved incidents",
+        "closed" => "No closed incidents",
+        _ => "No incidents found"
+    };
+}

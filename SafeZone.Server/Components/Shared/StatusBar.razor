@@ -1,0 +1,63 @@
+@implements IDisposable
+
+<div class="status-bar">
+    <div class="status-bar-left">
+        <span class="status-bar-clock">@CurrentTime</span>
+        <span>@CurrentDate</span>
+    </div>
+    <div class="status-bar-center">
+        <span class="status-online">
+            <span class="status-dot"></span>
+            SYSTEM ONLINE
+        </span>
+    </div>
+    <div class="status-bar-right">
+        <span>@Role</span>
+    </div>
+</div>
+
+@code {
+    private string CurrentTime = "";
+    private string CurrentDate = "";
+    private string Role = "User";
+    private System.Timers.Timer? _clockTimer;
+    private bool _disposed;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateClock();
+
+        if (AuthenticationStateTask is not null)
+        {
+            var authState = await AuthenticationStateTask;
+            Role = authState.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+        }
+
+        _clockTimer = new System.Timers.Timer(1000);
+        _clockTimer.Elapsed += async (_, _) =>
+        {
+            if (_disposed) return;
+            await InvokeAsync(UpdateClock);
+        };
+        _clockTimer.AutoReset = true;
+        _clockTimer.Start();
+    }
+
+    private Task UpdateClock()
+    {
+        var now = DateTime.Now;
+        CurrentTime = now.ToString("HH:mm:ss");
+        CurrentDate = now.ToString("yyyy-MM-dd");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _clockTimer?.Stop();
+        _clockTimer?.Dispose();
+    }
+}

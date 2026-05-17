@@ -1,0 +1,297 @@
+@page "/user/dashboard"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Resident")]
+@inject IIncidentService IncidentService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageHeader Title="Dashboard" Subtitle="Your neighborhood safety overview." />
+
+<StatusBar />
+
+<div class="stats-row dashboard-stats-row">
+    <MetricCard Label="Recent Reports" Value="@RecentIncidents.Count.ToString()" Icon="REP" Accent="primary" Change="Updated live" />
+    <MetricCard Label="Active Incidents" Value="@ActiveIncidents.ToString()" Icon="ACT" Accent="warning" />
+    <MetricCard Label="SOS Access" Value="Ready" Icon="SOS" Accent="danger" />
+    <MetricCard Label="Weather" Value="@WeatherTempDisplay" Icon="WX" Accent="info" Change="@WeatherCodeInfo.Description" />
+</div>
+
+<SectionContainer Title="Quick Actions">
+    <div class="action-grid dashboard-action-grid">
+        <a href="/user/report-incident" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--primary-dim); color: var(--primary);">REP</div>
+            <div class="action-label">Report Incident</div>
+            <div class="action-desc">Submit a new report</div>
+        </a>
+        <a href="/user/sos" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--danger-dim); color: var(--danger);">SOS</div>
+            <div class="action-label">SOS Emergency</div>
+            <div class="action-desc">Quick emergency call</div>
+        </a>
+        <a href="/user/file-fir" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--info-dim); color: var(--info);">FIR</div>
+            <div class="action-label">File FIR</div>
+            <div class="action-desc">Official police report</div>
+        </a>
+        <a href="/user/my-incidents" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--warning-dim); color: var(--warning);">LOG</div>
+            <div class="action-label">My Reports</div>
+            <div class="action-desc">View your history</div>
+        </a>
+        <a href="/user/notifications" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--purple-dim); color: var(--purple);">ALT</div>
+            <div class="action-label">Alerts</div>
+            <div class="action-desc">Safety notifications</div>
+        </a>
+        <a href="/user/weather-map" class="action-card feature-card">
+            <div class="action-icon" style="background: var(--info-dim); color: var(--info);">MAP</div>
+            <div class="action-label">Weather Map</div>
+            <div class="action-desc">Rain, temperature, pollution</div>
+        </a>
+    </div>
+</SectionContainer>
+
+<div class="dashboard-overview-grid">
+    <GlassCard Title="Live Map" Class="dashboard-live-map-card">
+        <div id="user-map" class="dashboard-map-preview" style="height: 420px; border-radius: var(--radius-md); overflow: hidden;">
+            @if (IsIncidentsLoading)
+            {
+                <div style="display:flex; justify-content:center; align-items:center; height:100%; color:var(--text-3);">
+                    Loading map...
+                </div>
+            }
+        </div>
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span class="badge badge-primary">Live Map</span>
+                <span style="color: var(--text-2); font-size: 0.9rem; margin-left: 8px;">Neighborhood monitoring</span>
+            </div>
+            <a href="/user/weather-map" class="btn btn-secondary btn-sm">Open Full Map</a>
+        </div>
+    </GlassCard>
+
+    <div class="dashboard-side-stack">
+        <GlassCard Title="Weather">
+            @if (IsWeatherLoading)
+            {
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text-sm"></div>
+            }
+            else
+            {
+                <div class="dashboard-weather">
+                    <div>
+                        <div class="dashboard-weather-value">@WeatherTempDisplay</div>
+                        <p>@WeatherCodeInfo.Description</p>
+                    </div>
+                    <span class="badge badge-info">@WeatherCodeInfo.ShortCode</span>
+                </div>
+                <div class="dashboard-mini-grid">
+                    <div>
+                        <span>Humidity</span>
+                        <strong>@WeatherHumidity%</strong>
+                    </div>
+                    <div>
+                        <span>Wind</span>
+                        <strong>@WeatherWind.ToString("F0") km/h</strong>
+                    </div>
+                    <div>
+                        <span>Rain</span>
+                        <strong>@WeatherRain.ToString("F1") mm</strong>
+                    </div>
+                    <div>
+                        <span>UV</span>
+                        <strong>@WeatherUV.ToString("F1")</strong>
+                    </div>
+                </div>
+            }
+        </GlassCard>
+
+        <GlassCard Title="Safety Overview">
+            <div class="dashboard-safety-list">
+                <div>
+                    <span class="dashboard-safety-dot is-safe"></span>
+                    <span>Emergency line</span>
+                    <strong>Ready</strong>
+                </div>
+                <div>
+                    <span class="dashboard-safety-dot is-warning"></span>
+                    <span>Active reports</span>
+                    <strong>@ActiveIncidents</strong>
+                </div>
+                <div>
+                    <span class="dashboard-safety-dot is-info"></span>
+                    <span>Weather status</span>
+                    <strong>@WeatherCodeInfo.Description</strong>
+                </div>
+            </div>
+        </GlassCard>
+
+        <GlassCard Title="Recent Incidents">
+            @if (IsIncidentsLoading)
+            {
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+            }
+            else if (RecentIncidents.Count == 0)
+            {
+                <div class="empty-state dashboard-empty-state">
+                    <div class="empty-icon">OK</div>
+                    <h3>No active incidents</h3>
+                    <p>Your neighborhood is safe right now.</p>
+                </div>
+            }
+            else
+            {
+                <div class="dashboard-incident-list">
+                    @foreach (var incident in RecentIncidents.Take(5))
+                    {
+                        <a href="/user/my-incidents" class="dashboard-incident-item">
+                            <span>
+                                <strong>@incident.Title</strong>
+                                <small>@incident.CategoryName</small>
+                            </span>
+                            <span class="badge @GetSeverityClass(incident.Severity)">@incident.Severity</span>
+                        </a>
+                    }
+                </div>
+            }
+        </GlassCard>
+    </div>
+</div>
+
+@code {
+    private List<IncidentListDto> RecentIncidents { get; set; } = new();
+    private bool IsWeatherLoading { get; set; } = true;
+    private bool IsIncidentsLoading { get; set; } = true;
+
+    private double WeatherTemp { get; set; } = 32;
+    private int WeatherHumidity { get; set; } = 65;
+    private double WeatherWind { get; set; } = 18;
+    private double WeatherRain { get; set; }
+    private double WeatherUV { get; set; } = 5.2;
+    private int WeatherCode { get; set; }
+
+    private int ActiveIncidents => RecentIncidents.Count(i => i.Status is IncidentStatus.Pending or IncidentStatus.Assigned or IncidentStatus.InProgress);
+    private string WeatherTempDisplay => $"{WeatherTemp:F0}C";
+
+    private (string ShortCode, string Description) WeatherCodeInfo => WeatherCodes.GetValueOrDefault(WeatherCode, ("CLR", "Clear sky"));
+
+    private static readonly Dictionary<int, (string ShortCode, string Description)> WeatherCodes = new()
+    {
+        [0] = ("CLR", "Clear sky"), [1] = ("CLR", "Mainly clear"), [2] = ("CLD", "Partly cloudy"), [3] = ("CLD", "Overcast"),
+        [45] = ("FOG", "Fog"), [48] = ("FOG", "Rime fog"),
+        [51] = ("DRZ", "Light drizzle"), [53] = ("DRZ", "Moderate drizzle"), [55] = ("DRZ", "Dense drizzle"),
+        [61] = ("RAN", "Slight rain"), [63] = ("RAN", "Moderate rain"), [65] = ("RAN", "Heavy rain"),
+        [71] = ("SNW", "Slight snow"), [73] = ("SNW", "Moderate snow"), [75] = ("SNW", "Heavy snow"), [77] = ("SNW", "Snow grains"),
+        [80] = ("SHW", "Rain showers"), [81] = ("SHW", "Slight showers"), [82] = ("SHW", "Moderate showers"),
+        [85] = ("SNW", "Snow showers"), [86] = ("SNW", "Heavy snow showers"),
+        [95] = ("STM", "Thunderstorm"), [96] = ("STM", "Storm with hail"), [99] = ("STM", "Heavy hail storm")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadWeatherAsync(), LoadIncidentsAsync());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("safezoneMap.init", "user-map", new { zoomControl = false, scrollWheelZoom = false });
+                if (RecentIncidents != null && RecentIncidents.Any())
+                {
+                    await JS.InvokeVoidAsync("safezoneMap.addIncidentMarkers", "user-map", RecentIncidents);
+                    await JS.InvokeVoidAsync("safezoneMap.fitBounds", "user-map", RecentIncidents);
+                }
+            }
+            catch { /* Ignored for prerendering */ }
+        }
+    }
+
+    private async Task LoadWeatherAsync()
+    {
+        IsWeatherLoading = true;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var url = "https://api.open-meteo.com/v1/forecast?latitude=33.6844&longitude=73.0479&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,cloud_cover,uv_index&timezone=auto";
+            var response = await http.GetStringAsync(url);
+            var data = JsonSerializer.Deserialize<OpenMeteoResponse>(response);
+            if (data?.Current is not null)
+            {
+                WeatherTemp = data.Current.Temperature2M;
+                WeatherHumidity = data.Current.RelativeHumidity2M;
+                WeatherWind = data.Current.WindSpeed10M;
+                WeatherRain = data.Current.Rain;
+                WeatherUV = data.Current.UVIndex;
+                WeatherCode = data.Current.WeatherCode;
+            }
+        }
+        catch
+        {
+            WeatherTemp = 32;
+            WeatherHumidity = 65;
+            WeatherWind = 18;
+            WeatherRain = 0;
+            WeatherUV = 5.2;
+            WeatherCode = 0;
+        }
+        finally
+        {
+            IsWeatherLoading = false;
+        }
+    }
+
+    private async Task LoadIncidentsAsync()
+    {
+        IsIncidentsLoading = true;
+        try
+        {
+            var incidents = await IncidentService.GetAllIncidentsAsync();
+            RecentIncidents = incidents.OrderByDescending(i => i.ReportedAt).ToList();
+        }
+        catch
+        {
+            RecentIncidents = new List<IncidentListDto>();
+        }
+        finally
+        {
+            IsIncidentsLoading = false;
+        }
+    }
+
+    private static string GetSeverityClass(SeverityLevel severity) => $"badge-severity-{severity.ToString().ToLowerInvariant()}";
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("safezoneMap.dispose", "user-map");
+        }
+        catch
+        {
+            // The browser circuit may already be closed during navigation.
+        }
+    }
+
+    private class OpenMeteoResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("current")]
+        public OpenMeteoCurrent? Current { get; set; }
+    }
+
+    private class OpenMeteoCurrent
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("temperature_2m")] public double Temperature2M { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("relative_humidity_2m")] public int RelativeHumidity2M { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("wind_speed_10m")] public double WindSpeed10M { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("rain")] public double Rain { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("uv_index")] public double UVIndex { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("weather_code")] public int WeatherCode { get; set; }
+    }
+}

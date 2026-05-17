@@ -1,0 +1,122 @@
+@page "/login"
+@layout LoginLayout
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+@inject IWebHostEnvironment Environment
+
+<div class="login-page">
+    <div class="login-terminal">
+        <div class="login-terminal-header">Secure Access Terminal</div>
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="login-alert login-alert-error">
+                ⚠ @Uri.UnescapeDataString(error.Replace('+', ' '))
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(expired))
+        {
+            <div class="login-alert login-alert-warning">
+                ⚠ Your session has expired. Please log in again.
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(loggedOut))
+        {
+            <div class="login-alert login-alert-info">
+                ℹ You have been signed out safely.
+            </div>
+        }
+
+        <form @onsubmit="HandleLogin" @onsubmit:preventDefault class="space-y-6">
+            <div>
+                <label class="login-label">Username / Phone</label>
+                <input type="tel" class="login-input" placeholder="+923001234567" autocomplete="tel" required @bind="Model.PhoneNumber" @bind:event="oninput" />
+            </div>
+
+            <div>
+                <label class="login-label">Password</label>
+                <input type="password" class="login-input" placeholder="••••••••" autocomplete="current-password" required @bind="Model.Password" @bind:event="oninput" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="login-alert login-alert-error">
+                    ⚠ @ErrorMessage
+                </div>
+            }
+
+            <button type="submit" disabled="@IsLoading" class="login-btn">
+                @if (IsLoading)
+                {
+                    <span>PROCESSING...</span>
+                }
+                else
+                {
+                    <span>AUTHENTICATE</span>
+                }
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 24px;">
+            <a href="/register" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-3); text-decoration: none; text-transform: uppercase; letter-spacing: 0.1em;">
+                Initialize Account →
+            </a>
+        </div>
+    </div>
+
+    <div class="login-test-creds">
+        <div class="login-test-creds-header">Test Credentials</div>
+        <div class="login-test-row">
+            <span style="color: var(--neon-green); font-weight: 600;">Resident</span>
+            <span style="font-family: var(--font-mono); font-size: 0.8rem;">+923001234567 / User123!</span>
+        </div>
+        <div class="login-test-row">
+            <span style="color: var(--command-purple); font-weight: 600;">Authority</span>
+            <span style="font-family: var(--font-mono); font-size: 0.8rem;">+92511112233 / Officer123!</span>
+        </div>
+        <div class="login-test-row">
+            <span style="color: var(--alert-red); font-weight: 600;">SuperAdmin</span>
+            <span style="font-family: var(--font-mono); font-size: 0.8rem;">+92511234567 / Admin123!</span>
+        </div>
+    </div>
+
+    <p style="text-align: center; margin-top: 24px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em;">
+        SafeZone v1.0 • CS-284L • Air University
+    </p>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? error { get; set; }
+    [SupplyParameterFromQuery] public string? expired { get; set; }
+    [SupplyParameterFromQuery] public string? loggedOut { get; set; }
+
+    private LoginModel Model { get; set; } = new();
+    private string? ErrorMessage { get; set; }
+    private bool IsLoading { get; set; }
+    private bool IsGoogleConfigured =>
+        !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientId"])
+        && !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientSecret"]);
+    private string GoogleButtonText => IsGoogleConfigured
+        ? "Sign in with Google"
+        : Environment.IsDevelopment() ? "Continue with Google fallback" : "Google login unavailable";
+
+    private class LoginModel
+    {
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private void HandleLogin()
+    {
+        ErrorMessage = null;
+        IsLoading = true;
+
+        var phone = Uri.EscapeDataString(Model.PhoneNumber.Trim());
+        var password = Uri.EscapeDataString(Model.Password);
+
+        Navigation.NavigateTo($"/blazor-login?phone={phone}&password={password}", forceLoad: true);
+    }
+}

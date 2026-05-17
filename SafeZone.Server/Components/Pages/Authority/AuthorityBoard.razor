@@ -1,0 +1,170 @@
+@page "/authority/board"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject IIncidentService IncidentService
+@inject IFirService FirService
+@inject IAlertService AlertService
+@inject NavigationManager Navigation
+
+<PageTitle>Command Center - SafeZone</PageTitle>
+
+<StatusBar />
+
+<PageHeader Title="Command Center"
+            Subtitle="Superadmin and authority oversight dashboard" />
+
+@if (isLoading)
+{
+    <LoadingSkeleton Type="stats" />
+}
+else
+{
+    <div class="stats-row">
+        <MetricCard Label="Total Incidents" Value="@totalIncidents.ToString()" Icon="&#x1F4CA;" Accent="primary" />
+        <MetricCard Label="Active Incidents" Value="@activeIncidents.ToString()" Icon="&#x1F504;" Accent="warning" />
+        <MetricCard Label="Resolved Today" Value="@resolvedToday.ToString()" Icon="&#x2705;" Accent="primary" Change="@($"+{resolvedToday} today")" />
+        <MetricCard Label="Pending FIRs" Value="@pendingFirs.ToString()" Icon="&#x1F4C4;" Accent="danger" />
+    </div>
+}
+
+<SectionContainer Title="Quick Actions">
+    <div class="action-grid">
+        <a href="/authority/dispatch" class="action-card">
+            <div class="action-icon" style="background: var(--primary-dim); color: var(--primary);">&#x1F5FA;</div>
+            <div class="action-label">Dispatch Map</div>
+            <div class="action-desc">Real-time incident dispatch</div>
+        </a>
+        <a href="/authority/field-reports" class="action-card">
+            <div class="action-icon" style="background: var(--warning-dim); color: var(--warning);">&#x1F4CB;</div>
+            <div class="action-label">Field Reports</div>
+            <div class="action-desc">View and manage reports</div>
+        </a>
+        <a href="/authority/fir-management" class="action-card">
+            <div class="action-icon" style="background: var(--info-dim); color: var(--info);">&#x1F4C4;</div>
+            <div class="action-label">FIR Management</div>
+            <div class="action-desc">Review and process FIRs</div>
+        </a>
+        <a href="/authority/settings" class="action-card">
+            <div class="action-icon" style="background: var(--danger-dim); color: var(--danger);">&#x1F4E2;</div>
+            <div class="action-label">Broadcast Alert</div>
+            <div class="action-desc">Send public alerts</div>
+        </a>
+    </div>
+</SectionContainer>
+
+<div class="grid md:grid-cols-3 gap-6">
+    <div class="md:col-span-2">
+        <GlassCard Class="p-0 overflow-hidden" Title="Recent Incidents">
+            @if (recentIncidents.Count == 0)
+            {
+                <div class="p-6 text-center">
+                    <p style="color: var(--text-3);">No incidents reported</p>
+                </div>
+            }
+            else
+            {
+                <div class="command-table-wrap">
+                    <table class="command-table">
+                        <thead>
+                            <tr>
+                                <th>Incident#</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Severity</th>
+                                <th>Reported At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var incident in recentIncidents)
+                            {
+                                <tr @onclick='() => Navigation.NavigateTo("/authority/field-reports")'>
+                                    <td class="mono-cell">@incident.IncidentNumber</td>
+                                    <td class="font-medium">@incident.Title</td>
+                                    <td><StatusChip Status="@incident.Status.ToString()" /></td>
+                                    <td><SeverityChip Severity="@incident.Severity" /></td>
+                                    <td style="color: var(--text-3); font-size: 11px;">@incident.ReportedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </GlassCard>
+    </div>
+
+    <div>
+        <GlassCard Title="Active Alerts">
+            @if (activeAlerts.Count == 0)
+            {
+                <div class="text-center py-6">
+                    <div style="font-size: 28px; margin-bottom: 8px;">&#x2705;</div>
+                    <p style="color: var(--text-3);">No active alerts</p>
+                </div>
+            }
+            else
+            {
+                <div>
+                    @foreach (var alert in activeAlerts)
+                    {
+                        <div class="command-alert-card @GetAlertTypeClass(alert.Type)">
+                            <div class="flex items-start justify-between mb-1">
+                                <p class="alert-title">@alert.Title</p>
+                                <span class="badge badge-@GetAlertTypeBadge(alert.Type) text-xs">@alert.Type</span>
+                            </div>
+                            <p class="alert-time">@alert.IssuedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</p>
+                        </div>
+                    }
+                </div>
+            }
+        </GlassCard>
+    </div>
+</div>
+
+@code {
+    private int totalIncidents;
+    private int activeIncidents;
+    private int resolvedToday;
+    private int pendingFirs;
+    private List<IncidentListDto> recentIncidents = [];
+    private List<AlertListDto> activeAlerts = [];
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var allIncidents = await IncidentService.GetAllIncidentsAsync();
+            totalIncidents = allIncidents.Count;
+            activeIncidents = allIncidents.Count(i => i.Status == IncidentStatus.Pending || i.Status == IncidentStatus.Assigned || i.Status == IncidentStatus.InProgress);
+            resolvedToday = allIncidents.Count(i => i.Status == IncidentStatus.Resolved && i.ReportedAt.Date == DateTime.UtcNow.Date);
+            recentIncidents = allIncidents.OrderByDescending(i => i.ReportedAt).Take(5).ToList();
+
+            var allFirs = await FirService.GetAllFirsAsync();
+            pendingFirs = allFirs.Count(f => f.Status == FIRStatus.Submitted || f.Status == FIRStatus.UnderReview);
+
+            activeAlerts = await AlertService.GetActiveAlertsAsync();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private string GetAlertTypeBadge(AlertType type) => type switch
+    {
+        AlertType.Emergency => "danger",
+        AlertType.Warning => "warning",
+        AlertType.Info => "primary",
+        AlertType.WeatherAlert => "info",
+        AlertType.CurfewNotice => "purple",
+        _ => "secondary"
+    };
+
+    private string GetAlertTypeClass(AlertType type) => type switch
+    {
+        AlertType.Emergency => "danger",
+        AlertType.Warning => "warning",
+        AlertType.Info => "info",
+        AlertType.WeatherAlert => "info",
+        AlertType.CurfewNotice => "purple",
+        _ => ""
+    };
+}

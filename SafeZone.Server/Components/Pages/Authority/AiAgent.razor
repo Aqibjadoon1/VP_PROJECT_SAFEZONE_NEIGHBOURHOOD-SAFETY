@@ -1,0 +1,197 @@
+@page "/authority/ai-agent"
+@layout DashboardLayout
+@attribute [Authorize(Roles = "Authority,Admin,SuperAdmin")]
+@inject ILanguageModel LlmService
+@inject NavigationManager Navigation
+
+<div class="ambient-glow-2"></div>
+<div class="max-w-4xl mx-auto pb-8 px-4">
+    <PageHeader Title="AI Assistant" Subtitle="SafeZone AI Incident Advisor" />
+
+    <div class="glass-elevated overflow-hidden" style="display: flex; flex-direction: column;">
+        @* System Prompt Section (Collapsible) *@
+        <div class="border-b" style="border-color: var(--glass-border);">
+            <button class="w-full px-6 py-3 flex items-center justify-between transition-colors" style="background: var(--glass); border: none; color: inherit; cursor: pointer;" @onclick='() => showSystemPrompt = !showSystemPrompt'>
+                <span class="text-sm font-medium text-muted">System Prompt</span>
+                <span class="text-muted transition-transform" style="transform: rotate(@(showSystemPrompt ? "180deg" : "0deg"));">▾</span>
+            </button>
+            @if (showSystemPrompt)
+            {
+                <div class="px-6 py-4" style="background: var(--glass);">
+                    <p class="text-sm text-muted whitespace-pre-wrap">@SystemPrompt</p>
+                </div>
+            }
+        </div>
+
+        @* Chat Messages Area *@
+        <div class="p-6" style="max-height: 60vh; overflow-y: auto; flex: 1;" @ref="chatContainer">
+            @if (messages.Count == 0)
+            {
+                <div class="text-center py-12">
+                    <p class="text-muted">Start a conversation with the AI assistant.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var msg in messages.Where(m => m.Role != ChatRole.System))
+                {
+                    <div class="mb-4 @(msg.Role == ChatRole.User ? "flex justify-end" : msg.Role == ChatRole.Assistant ? "flex justify-start" : "flex justify-center")">
+                        @if (msg.Role == ChatRole.System)
+                        {
+                            <div class="text-center">
+                                <p class="text-xs text-muted italic">@msg.Content</p>
+                            </div>
+                        }
+                        else if (msg.Role == ChatRole.User)
+                        {
+                            <div class="max-w-[75%] p-4 rounded-2xl" style="background: var(--primary-dim); border: 1px solid var(--primary-glow); border-bottom-right-radius: 4px;">
+                                <p class="text-xs font-medium mb-1" style="color: var(--primary);">You</p>
+                                <p class="text-sm whitespace-pre-wrap" style="color: var(--text-1);">@msg.Content</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="max-w-[75%] p-4 rounded-2xl" style="background: var(--glass); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px;">
+                                <p class="text-xs font-medium mb-1 text-muted">AI Assistant</p>
+                                <p class="text-sm whitespace-pre-wrap">@msg.Content</p>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (isThinking)
+                {
+                    <div class="flex justify-start mb-4">
+                        <div class="p-4 rounded-2xl" style="background: var(--glass); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px;">
+                            <p class="text-xs font-medium mb-1 text-muted">AI Assistant</p>
+                            <p class="text-sm text-muted">🤔 Thinking...</p>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        @* Input Area *@
+        <div class="p-4 border-t" style="border-color: var(--glass-border); background: var(--bg-surface);">
+            <form @onsubmit='SendMessage'>
+                <div class="flex gap-3 items-end">
+                    <div class="flex-1">
+                        <textarea class="w-full form-input" rows="2" style="resize: none; min-height: 44px; max-height: 120px;" placeholder="Type your message... (Enter to send, Shift+Enter for new line)" @bind='userInput' @onkeydown='HandleKeyDown'></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" disabled="@(string.IsNullOrWhiteSpace(userInput) || isThinking)" style="height: 44px; min-width: 44px;">
+                        @if (isThinking)
+                        {
+                            <span class="spinner"></span>
+                        }
+                        else
+                        {
+                            <span>Send</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick='NewChat' style="height: 44px; min-width: 44px;" title="New Chat">
+                        <span>New</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-input {
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        padding: 12px 16px;
+        color: var(--text-1);
+        font-family: var(--font-ui);
+        font-size: 0.95rem;
+        transition: all var(--transition-fast);
+        width: 100%;
+    }
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-dim);
+    }
+    .form-input::placeholder {
+        color: var(--text-3);
+    }
+</style>
+
+@code {
+    private List<ChatMessage> messages = [];
+    private string userInput = "";
+    private bool isThinking;
+    private bool showSystemPrompt;
+    private ElementReference chatContainer;
+
+    private readonly string SystemPrompt = "You are a SafeZone AI incident advisor helping authority personnel manage emergencies, review incidents, and coordinate responses. Provide concise, actionable advice. Keep responses under 200 words.";
+
+    protected override void OnInitialized()
+    {
+        messages =
+        [
+            new ChatMessage { Role = ChatRole.System, Content = SystemPrompt },
+            new ChatMessage { Role = ChatRole.Assistant, Content = "Hello! I'm your SafeZone AI assistant. How can I help you with incident management today?" }
+        ];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await ScrollToBottom();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isThinking) return;
+
+        var userMsg = userInput.Trim();
+        userInput = "";
+
+        messages.Add(new ChatMessage { Role = ChatRole.User, Content = userMsg });
+
+        isThinking = true;
+
+        try
+        {
+            var history = messages.Where(m => m.Role != ChatRole.System).ToList();
+            var response = await LlmService.GenerateResponseAsync(userMsg, history, SystemPrompt, CancellationToken.None);
+            messages.Add(new ChatMessage { Role = ChatRole.Assistant, Content = response });
+        }
+        catch (Exception ex)
+        {
+            messages.Add(new ChatMessage { Role = ChatRole.Assistant, Content = $"Error: {ex.Message}" });
+        }
+        finally
+        {
+            isThinking = false;
+        }
+    }
+
+    private void NewChat()
+    {
+        messages =
+        [
+            new ChatMessage { Role = ChatRole.System, Content = SystemPrompt },
+            new ChatMessage { Role = ChatRole.Assistant, Content = "Hello! I'm your SafeZone AI assistant. How can I help you with incident management today?" }
+        ];
+    }
+}
