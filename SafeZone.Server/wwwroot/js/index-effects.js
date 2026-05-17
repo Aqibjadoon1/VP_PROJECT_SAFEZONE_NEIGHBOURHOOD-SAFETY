@@ -198,22 +198,36 @@ window.initHeroEffects = function () {
         pAngles[i] = Math.atan2(pp[i * 3 + 2], pp[i * 3]);
     }
 
-    // === Animation ===
+    // === Animation with damping for smooth rotation ===
     var time = 0;
+    var rotY = 0, rotX = 0, targetRotY = 0, targetRotX = 0;
+    var innerRotY = 0, innerRotX = 0;
+    var ringRotY = 0, ring2RotY = 0;
+    var dampFactor = 0.05;
+
     function animate() {
         requestAnimationFrame(animate);
         time += 0.008;
 
-        targetX += (mouseX - targetX) * 0.03;
-        targetY += (mouseY - targetY) * 0.03;
+        targetX += (mouseX - targetX) * 0.025;
+        targetY += (mouseY - targetY) * 0.025;
 
-        nodeGroup.rotation.y += 0.004;
-        nodeGroup.rotation.x += 0.001;
-        innerGroup.rotation.y -= 0.003;
-        innerGroup.rotation.x += 0.001;
+        targetRotY += 0.004;
+        targetRotX += 0.001;
+        rotY += (targetRotY - rotY) * dampFactor;
+        rotX += (targetRotX - rotX) * dampFactor;
+        nodeGroup.rotation.y = rotY;
+        nodeGroup.rotation.x = rotX;
 
-        ring.rotation.y += 0.005;
-        ring2.rotation.y -= 0.004;
+        innerRotY -= 0.003;
+        innerRotX += 0.001;
+        innerGroup.rotation.y += (innerRotY - innerGroup.rotation.y) * dampFactor;
+        innerGroup.rotation.x += (innerRotX - innerGroup.rotation.x) * dampFactor;
+
+        ringRotY += 0.005;
+        ring2RotY -= 0.004;
+        ring.rotation.y += (ringRotY - ring.rotation.y) * dampFactor;
+        ring2.rotation.y += (ring2RotY - ring2.rotation.y) * dampFactor;
 
         for (var i = 0; i < pCount; i++) {
             pAngles[i] += pSpeeds[i] * 0.008;
@@ -226,9 +240,11 @@ window.initHeroEffects = function () {
 
         var ca = targetX * 0.35;
         var ch = 0.5 + targetY * 0.3;
-        camera.position.x = Math.sin(ca) * 6;
-        camera.position.z = Math.cos(ca) * 6;
-        camera.position.y = ch;
+        var cx = Math.sin(ca) * 6;
+        var cz = Math.cos(ca) * 6;
+        camera.position.x += (cx - camera.position.x) * 0.04;
+        camera.position.y += (ch - camera.position.y) * 0.04;
+        camera.position.z += (cz - camera.position.z) * 0.04;
         camera.lookAt(0, 0, 0);
 
         renderer.render(scene, camera);
