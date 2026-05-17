@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SafeZone.Server.Data;
 using SafeZone.Server.Hubs;
+using SafeZone.Server.Middleware;
 using SafeZone.Server.Models;
 using SafeZone.Server.Services;
 using System.Security.Claims;
@@ -189,6 +190,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.UseStaticFiles();
 app.UseRouting();
+app.UseMiddleware<RateLimitingMiddleware>();
 app.Use(async (context, next) =>
 {
     if (RequiresNoStore(context.Request.Path))
