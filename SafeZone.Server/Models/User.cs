@@ -29,6 +29,11 @@ public class User : IdentityUser<Guid>
     
     public bool IsActive { get; set; } = true;
 
+    [MaxLength(512)]
+    public string? RefreshToken { get; set; }
+
+    public DateTime? RefreshTokenExpiry { get; set; }
+
     public Authority? AuthorityProfile { get; set; }
     public ICollection<Incident> ReportedIncidents { get; set; } = new List<Incident>();
     public ICollection<Comment> Comments { get; set; } = new List<Comment>();
