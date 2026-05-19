@@ -162,6 +162,8 @@ builder.Services.AddSingleton<ITextToSpeech, MockTtsService>();
 builder.Services.AddSingleton<IVoicePipeline, VoicePipelineService>();
 builder.Services.AddScoped<IVoiceCallService, VoiceCallService>();
 builder.Services.AddSingleton<ISmsService, MockSmsService>();
+builder.Services.AddSingleton<IVoiceActivityDetector, EnergyVadService>();
+builder.Services.AddSingleton<ISlackNotificationService, SlackNotificationService>();
 
 builder.Services.AddCors(options =>
 {
