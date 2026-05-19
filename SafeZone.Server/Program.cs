@@ -162,6 +162,7 @@ builder.Services.AddSingleton<ITextToSpeech, MockTtsService>();
 builder.Services.AddSingleton<IVoicePipeline, VoicePipelineService>();
 builder.Services.AddScoped<IVoiceCallService, VoiceCallService>();
 builder.Services.AddSingleton<ISmsService, MockSmsService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 builder.Services.AddCors(options =>
 {
@@ -191,6 +192,7 @@ app.UseCors("AllowAll");
 app.UseStaticFiles();
 app.UseRouting();
 app.UseMiddleware<RateLimitingMiddleware>();
+app.UseMiddleware<AuditMiddleware>();
 app.Use(async (context, next) =>
 {
     if (RequiresNoStore(context.Request.Path))
