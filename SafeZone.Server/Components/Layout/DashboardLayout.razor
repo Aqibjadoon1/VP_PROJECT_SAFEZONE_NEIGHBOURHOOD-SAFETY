@@ -28,7 +28,7 @@
         <button type="button" class="dashboard-theme-overlay is-open" @onclick="ToggleSidebar" aria-label="Close menu"></button>
     }
 
-    <main class="dashboard-theme-main" style="flex:1;min-width:0;">
+    <main class="dashboard-theme-main @(_sidebarOpen ? "sidebar-shifted" : "")" style="flex:1;min-width:0;" @onclick="CloseSidebarOnOutsideTap">
         <StatusBar />
         <header class="dashboard-theme-topbar">
             <div class="dashboard-theme-topbar-title">
@@ -110,6 +110,11 @@
     private void ToggleSidebar()
     {
         _sidebarOpen = !_sidebarOpen;
+    }
+
+    private void CloseSidebarOnOutsideTap()
+    {
+        if (_sidebarOpen) _sidebarOpen = false;
     }
 
     private void StartSessionCheck()
