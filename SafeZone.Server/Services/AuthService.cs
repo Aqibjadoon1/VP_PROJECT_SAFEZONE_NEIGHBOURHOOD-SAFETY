@@ -78,6 +78,10 @@ public class AuthService : IAuthService
         var token = await GenerateJwtTokenAsync(user);
         var refreshToken = GenerateRefreshToken();
 
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        await _userManager.UpdateAsync(user);
+
         return new AuthResponseDto
         {
             Success = true,
@@ -129,6 +133,10 @@ public class AuthService : IAuthService
         var token = await GenerateJwtTokenAsync(user);
         var refreshToken = GenerateRefreshToken();
 
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        await _userManager.UpdateAsync(user);
+
         return new AuthResponseDto
         {
             Success = true,
@@ -142,11 +150,46 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
     {
-        return await Task.FromResult(new AuthResponseDto
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
-            Success = false,
-            Message = "Refresh token endpoint is simplified for this version. Please login again."
-        });
+            return new AuthResponseDto { Success = false, Message = "Refresh token is required." };
+        }
+
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+
+        if (user == null)
+        {
+            return new AuthResponseDto { Success = false, Message = "Invalid refresh token." };
+        }
+
+        if (user.RefreshTokenExpiry is null || user.RefreshTokenExpiry < DateTime.UtcNow)
+        {
+            return new AuthResponseDto { Success = false, Message = "Refresh token has expired." };
+        }
+
+        if (!user.IsActive)
+        {
+            return new AuthResponseDto { Success = false, Message = "Account is deactivated." };
+        }
+
+        var newToken = await GenerateJwtTokenAsync(user);
+        var newRefreshToken = GenerateRefreshToken();
+
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        user.LastActiveAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Token refreshed.",
+            Token = newToken,
+            RefreshToken = newRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpiryMinutes", 15)),
+            User = MapToUserDto(user)
+        };
     }
 
     public async Task<AuthResponseDto> LogoutAsync(Guid userId)
@@ -155,6 +198,8 @@ public class AuthService : IAuthService
         if (user != null)
         {
             user.LastActiveAt = DateTime.UtcNow;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
             await _userManager.UpdateAsync(user);
         }
 
