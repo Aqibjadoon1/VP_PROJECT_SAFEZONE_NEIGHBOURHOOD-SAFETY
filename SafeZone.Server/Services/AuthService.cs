@@ -278,4 +278,49 @@ public class AuthService : IAuthService
             IsActive = user.IsActive
         };
     }
+
+    public async Task<string> GeneratePasswordResetTokenAsync(string phoneNumber)
+    {
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
+
+        if (user == null)
+            throw new KeyNotFoundException("User not found.");
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        return token;
+    }
+
+    public async Task<AuthResponseDto> ResetPasswordAsync(string phoneNumber, string token, string newPassword)
+    {
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
+
+        if (user == null)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "User not found."
+            };
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = $"Password reset failed: {errors}"
+            };
+        }
+
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Password has been reset successfully."
+        };
+    }
 }

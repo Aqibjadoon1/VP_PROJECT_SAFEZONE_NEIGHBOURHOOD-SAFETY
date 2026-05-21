@@ -12,4 +12,6 @@ public interface IAuthService
     Task<UserDto?> GetUserByIdAsync(Guid userId);
     Task<string> GenerateJwtTokenAsync(User user);
     string GenerateRefreshToken();
+    Task<string> GeneratePasswordResetTokenAsync(string phoneNumber);
+    Task<AuthResponseDto> ResetPasswordAsync(string phoneNumber, string token, string newPassword);
 }
