@@ -164,6 +164,7 @@ builder.Services.AddSingleton<ISmsService, MockSmsService>();
 builder.Services.AddSingleton<IVoiceActivityDetector, EnergyVadService>();
 builder.Services.AddSingleton<ISlackNotificationService, SlackNotificationService>();
 
+builder.Services.AddSingleton<IGmailNotificationService, GmailNotificationService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
