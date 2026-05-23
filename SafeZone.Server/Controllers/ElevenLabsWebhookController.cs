@@ -148,8 +148,16 @@ public class ElevenLabsWebhookController : ControllerBase
 
     private static string ResolveTitle(string? category)
     {
-        var cat = category ?? "Incident";
-        cat = char.ToUpperInvariant(cat[0]) + cat[1..];
+        var cat = category ?? string.Empty;
+        if (cat.Length > 0)
+        {
+            cat = char.ToUpperInvariant(cat[0]) + cat[1..];
+        }
+        else
+        {
+            cat = "Incident";
+        }
+
         return $"{cat} – Voice Agent Report";
     }
 
