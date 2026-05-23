@@ -149,16 +149,17 @@ public static class SeedData
             return user;
         }
 
-        user.UserName = userName;
-        user.PhoneNumber = phoneNumber;
-        user.FullName = fullName;
-        user.Role = role;
-        user.IsActive = true;
-        user.ProximityRadiusKm = radiusKm;
-        user.LastKnownLatitude = latitude;
-        user.LastKnownLongitude = longitude;
+        if (user.FullName != fullName || user.Role != role)
+        {
+            user.FullName = fullName;
+            user.Role = role;
+            user.IsActive = true;
+            user.ProximityRadiusKm = radiusKm;
+            user.LastKnownLatitude = latitude;
+            user.LastKnownLongitude = longitude;
 
-        await userManager.UpdateAsync(user);
+            await userManager.UpdateAsync(user);
+        }
 
         if (!await userManager.CheckPasswordAsync(user, password))
         {

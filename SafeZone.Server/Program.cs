@@ -166,6 +166,7 @@ builder.Services.AddSingleton<IVoiceActivityDetector, EnergyVadService>();
 builder.Services.AddSingleton<ISlackNotificationService, SlackNotificationService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IGmailNotificationService, GmailNotificationService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
