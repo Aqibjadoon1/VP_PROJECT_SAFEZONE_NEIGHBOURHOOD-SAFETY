@@ -52,7 +52,7 @@
                         }
                         @foreach (var inc in incidents)
                         {
-                            <div class="kanban-card" style="position: relative; padding: 14px 12px; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-md); margin-bottom: 10px; cursor: pointer; overflow: hidden;" @onclick='() => OpenMoveModal(inc)'>
+                            <div class="kanban-card @(justMovedId == inc.IncidentId ? "just-moved" : "")" style="position: relative; padding: 14px 12px; background: var(--bg-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-md); margin-bottom: 10px; cursor: pointer; overflow: hidden;" @onclick='() => OpenMoveModal(inc)'>
                                 <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: @GetSeverityColor(inc.Severity); opacity: 0.6;"></div>
                                 <div style="font-weight: 600; font-size: 12px; line-height: 1.4; color: var(--text-1); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; padding-left: 8px; min-height: 34px;">@inc.Title</div>
                                 <div style="display: flex; align-items: center; justify-content: space-between; padding-left: 8px; gap: 8px;">
@@ -106,6 +106,7 @@
 @code {
     private List<IncidentListDto> allIncidents = [];
     private IncidentListDto? selectedIncident;
+    private Guid justMovedId;
     private bool showModal;
     private bool isLoading = true;
 
@@ -151,7 +152,10 @@
             Guid? uid = userIdClaim is not null && Guid.TryParse(userIdClaim, out var u) ? u : null;
             await IncidentService.UpdateStatusAsync(selectedIncident.IncidentId, newStatus, uid);
             allIncidents = await IncidentService.GetAllIncidentsAsync();
+            justMovedId = selectedIncident.IncidentId;
             CloseModal();
+            await Task.Delay(600);
+            justMovedId = Guid.Empty;
         }
         catch { }
     }
