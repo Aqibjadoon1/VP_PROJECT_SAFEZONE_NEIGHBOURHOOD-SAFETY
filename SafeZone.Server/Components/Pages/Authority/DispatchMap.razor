@@ -203,7 +203,7 @@
                 zoomControl = true,
                 scrollWheelZoom = true
             });
-            await JS.InvokeVoidAsync("safezoneMap.addIncidentMarkers", MapId, mapIncidents);
+            await JS.InvokeVoidAsync("safezoneMap.addClusteredIncidentMarkers", MapId, mapIncidents);
             if (mapIncidents.Count > 0)
             {
                 await JS.InvokeVoidAsync("safezoneMap.fitBounds", MapId, mapIncidents);
