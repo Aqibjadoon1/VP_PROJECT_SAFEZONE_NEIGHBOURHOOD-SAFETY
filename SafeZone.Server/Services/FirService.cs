@@ -8,10 +8,12 @@ namespace SafeZone.Server.Services;
 public class FirService : IFirService
 {
     private readonly SafeZoneDbContext _context;
+    private readonly IGmailNotificationService? _gmail;
 
-    public FirService(SafeZoneDbContext context)
+    public FirService(SafeZoneDbContext context, IGmailNotificationService? gmail = null)
     {
         _context = context;
+        _gmail = gmail;
     }
 
     public async Task<FirResponseDto> CreateFirAsync(CreateFirDto dto, Guid reporterId)
@@ -133,6 +135,15 @@ public class FirService : IFirService
         }
 
         await _context.SaveChangesAsync();
+
+        if (_gmail != null && (status == FIRStatus.Accepted || status == FIRStatus.Rejected))
+        {
+            var reporter = await _context.Users.FirstOrDefaultAsync(u => u.Id == fir.ReporterId);
+            if (reporter?.PhoneNumber != null)
+            {
+                _ = _gmail.SendFirStatusEmailAsync(reporter.PhoneNumber, fir.FIRNumber, status.ToString());
+            }
+        }
 
         return await MapToResponseAsync(fir);
     }
