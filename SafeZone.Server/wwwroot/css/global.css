@@ -47,8 +47,8 @@
 
     /* Text Colors */
     --text-1:          #FFFFFF;
-    --text-2:          rgba(255,255,255,0.70);
-    --text-3:          rgba(255,255,255,0.40);
+    --text-2:          rgba(255,255,255,0.85);
+    --text-3:          rgba(255,255,255,0.65);
 
     /* Ambient Glow */
     --glow-purple:     rgba(99, 51, 255, 0.3);
@@ -3847,27 +3847,6 @@ elevenlabs-convai {
     padding: 32px 16px;
     color: var(--text-3);
     font-size: 13px;
-}
-
-@keyframes kanban-card-enter {
-    from { opacity: 0; transform: translateY(12px) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes kanban-card-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.03); }
-    100% { transform: scale(1); }
-}
-
-.kanban-card {
-    animation: kanban-card-enter 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-}
-
-.kanban-card.just-moved {
-    animation: kanban-card-pulse 0.5s ease;
-    border-color: var(--neon-green) !important;
-    box-shadow: 0 0 16px var(--neon-green-glow);
 }
 
 /* Kanban modal */
