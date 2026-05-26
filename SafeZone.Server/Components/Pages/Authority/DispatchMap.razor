@@ -41,9 +41,9 @@
                 <div id="@MapId" class="authority-dispatch-map">
                     @if (isLoading)
                     {
-                        <div class="weather-map-overlay">
+                        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:10;background:rgba(10,10,20,0.85);">
                             <div class="spinner"></div>
-                            <p>Loading dispatch map...</p>
+                            <p style="color:var(--text-2);font-size:0.9rem;">Loading dispatch map...</p>
                         </div>
                     }
                 </div>
@@ -203,7 +203,7 @@
                 zoomControl = true,
                 scrollWheelZoom = true
             });
-            await JS.InvokeVoidAsync("safezoneMap.addClusteredIncidentMarkers", MapId, mapIncidents);
+            await JS.InvokeVoidAsync("safezoneMap.addIncidentMarkers", MapId, mapIncidents);
             if (mapIncidents.Count > 0)
             {
                 await JS.InvokeVoidAsync("safezoneMap.fitBounds", MapId, mapIncidents);
