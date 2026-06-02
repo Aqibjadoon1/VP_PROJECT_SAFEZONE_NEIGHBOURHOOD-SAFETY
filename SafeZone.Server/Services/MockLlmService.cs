@@ -2,6 +2,11 @@ namespace SafeZone.Server.Services;
 
 public class MockLlmService : ILanguageModel
 {
+    public MockLlmService()
+    {
+        Console.WriteLine("[MockLlmService] WARNING: Using mock LLM — no Groq API key configured. Responses are keyword-based.");
+    }
+
     private readonly Dictionary<ChatRole, string> _rolePrefixes = new()
     {
         { ChatRole.System, "[System] " },
