@@ -17,6 +17,8 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
+    /// <summary>Register a new user account with phone number and password.</summary>
+    /// <remarks>Creates user with specified role (Resident/Authority). Returns JWT token and refresh token.</remarks>
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
