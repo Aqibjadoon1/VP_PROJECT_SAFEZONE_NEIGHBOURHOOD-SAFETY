@@ -5,7 +5,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
 :root {
-    /* Backgrounds */
     --bg-void:         #0A0A14;
     --bg-deep:         #0D0D1A;
     --bg-surface:      #12121F;
@@ -15,10 +14,12 @@
     --glass-border:    rgba(255,255,255,0.10);
     --glass-border-strong: rgba(255,255,255,0.20);
 
-    /* Accent Colors */
     --primary:         #00FF88;
     --primary-dim:     rgba(0,255,136,0.15);
     --primary-glow:    rgba(0,255,136,0.3);
+    --neon-green: var(--primary);
+    --neon-green-dim: var(--primary-dim);
+    --neon-green-glow: var(--primary-glow);
     --danger:          #FF3B5C;
     --danger-dim:      rgba(255,59,92,0.15);
     --warning:         #FF9500;
@@ -27,11 +28,6 @@
     --info-dim:        rgba(59,130,246,0.15);
     --purple:          #A855F7;
     --purple-dim:      rgba(168,85,247,0.15);
-
-    /* Tactical Glow System */
-    --neon-green: #00FF88;
-    --neon-green-dim: rgba(0,255,136,0.15);
-    --neon-green-glow: rgba(0,255,136,0.30);
     --electric-cyan: #00D4FF;
     --electric-cyan-dim: rgba(0,212,255,0.15);
     --electric-cyan-glow: rgba(0,212,255,0.30);
@@ -45,10 +41,9 @@
     --command-purple-dim: rgba(139,92,246,0.15);
     --command-purple-glow: rgba(139,92,246,0.30);
 
-    /* Text Colors */
     --text-1:          #FFFFFF;
-    --text-2:          rgba(255,255,255,0.85);
-    --text-3:          rgba(255,255,255,0.65);
+    --text-2:          rgba(255,255,255,0.70);
+    --text-3:          rgba(255,255,255,0.40);
 
     /* Ambient Glow */
     --glow-purple:     rgba(99, 51, 255, 0.3);
