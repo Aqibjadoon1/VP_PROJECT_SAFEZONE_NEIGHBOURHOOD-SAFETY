@@ -19,7 +19,14 @@
         }
 
         if (!window.L) {
-            console.error('Leaflet is not loaded. Check Leaflet CSS/JS links in _Host.cshtml.');
+            console.warn('Leaflet not ready yet — retrying in 500ms...');
+            setTimeout(() => {
+                if (window.L && document.getElementById(containerId)) {
+                    initMap(containerId, options);
+                } else {
+                    console.error('Leaflet is not loaded. Check Leaflet CSS/JS links in _Host.cshtml.');
+                }
+            }, 500);
             return null;
         }
 
