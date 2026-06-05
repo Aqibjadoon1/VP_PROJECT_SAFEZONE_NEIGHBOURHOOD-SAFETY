@@ -44,32 +44,44 @@ Opens at `https://localhost:7026`. Swagger at `/swagger`.
 
 All services in this file are **opt-in**. Leave them empty and the app runs in full simulation mode.
 
-### 2.1 SMTP Email (Gmail / any provider)
+### 2.1 Gmail API (Real Email Sending)
 
 ```json
-"Smtp": {
-  "Host": "smtp.gmail.com",
-  "Port": 587,
+"Gmail": {
+  "ClientId": "your-client-id.apps.googleusercontent.com",
+  "ClientSecret": "GOCSPX-xxxxxxxxxxxxxxxxxxxx",
+  "RefreshToken": "1//xxxxxxxxxxxxxxxxxxxx",
   "FromEmail": "youraccount@gmail.com",
-  "User": "youraccount@gmail.com",
-  "Password": "your_app_password_here"
+  "ApplicationName": "SafeZone"
 }
 ```
 
-| Setting | Example | Notes |
-|---------|---------|-------|
-| `Host` | `smtp.gmail.com` | SMTP server hostname |
-| `Port` | `587` | 587 for TLS, 465 for SSL |
-| `FromEmail` | `alerts@yourdomain.com` | Sender address |
-| `User` | `you@gmail.com` | SMTP login (usually = FromEmail) |
-| `Password` | `xxxx xxxx xxxx xxxx` | **Gmail:** Use [App Password](https://myaccount.google.com/apppasswords), not your real password |
+| Setting | Notes |
+|---------|-------|
+| `ClientId` | From Google Cloud Console → OAuth 2.0 Client ID |
+| `ClientSecret` | From Google Cloud Console → OAuth 2.0 Client Secret |
+| `RefreshToken` | Generated via OAuth 2.0 Playground (see below) |
+| `FromEmail` | The Gmail address that sends emails |
+| `ApplicationName` | Display name (default: SafeZone) |
 
-**Where emails are sent:**
-- FIR status changes (Accepted/Rejected)
-- Incident alerts to residents
-- Emergency notifications
+**Step-by-step setup:**
 
-**Leave `Host` empty to disable email entirely.** The app logs "[Gmail] SMTP not configured" and continues normally.
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project or select existing
+3. Enable **Gmail API** (APIs & Services → Library → search "Gmail")
+4. Go to **APIs & Services → Credentials**
+5. Create OAuth 2.0 Client ID (Web application type)
+6. Add `https://developers.google.com/oauthplayground` to Authorized redirect URIs
+7. Copy `ClientId` and `ClientSecret`
+8. Go to [OAuth 2.0 Playground](https://developers.google.com/oauthplayground)
+9. Click gear icon → check "Use your own OAuth credentials" → paste ClientId/Secret
+10. Select scope: `https://www.googleapis.com/auth/gmail.send`
+11. Click "Authorize APIs" → sign in with your Gmail account
+12. Click "Exchange authorization code for tokens"
+13. Copy the **Refresh token**
+14. Fill all values in `appsettings.Development.json`
+
+**Leave all fields empty to disable.** The app logs "[Gmail API] Not configured" and continues normally.
 
 ### 2.2 Slack Webhook
 
