@@ -144,6 +144,55 @@ The landing page includes a floating voice agent widget that lets visitors speak
 
 **No API key needed** — the widget auto-initializes from the agent-id in the HTML. The webhook is public (no auth required, but should be restricted to ElevenLabs IP ranges in production).
 
+#### Webhook Tunneling (Local Dev)
+
+ElevenLabs requires a public HTTPS URL for webhooks. Your local machine is NOT publicly reachable — you need a tunnel.
+
+**Option A: Cloudflare Tunnel (free, no account limits)**
+
+```bash
+# Install once
+winget install cloudflare.cloudflared
+# Start tunnel
+cloudflared tunnel --url https://localhost:7026
+# → Output: https://your-random.trycloudflare.com
+```
+Copy the URL and set it as your ElevenLabs webhook: `https://your-random.trycloudflare.com/api/elevenlabswebhook`
+
+**Option B: ngrok (the one you're already using)**
+
+```bash
+ngrok http https://localhost:7026
+# → https://xxxx.ngrok.io → /api/elevenlabswebhook
+```
+
+**Option C: VS Dev Tunnels (built into Visual Studio 2022)**
+
+1. In VS, click the dropdown next to the run button
+2. Select "Dev Tunnels" → "Create Tunnel"
+3. Set tunnel type to "Persistent"  
+4. Set the ElevenLabs webhook URL to: `https://your-tunnel.devtunnels.ms/api/elevenlabswebhook`
+
+**Test the webhook locally:**
+
+```bash
+curl -X POST https://localhost:7026/api/elevenlabswebhook `
+  -H "Content-Type: application/json" `
+  -d '{
+    "agent_id": "test-123",
+    "conversation_id": "conv-456",
+    "caller_phone_number": "+923001234567",
+    "dynamic_variables": {
+      "category": "Fire",
+      "severity": "high",
+      "address": "Blue Area, Islamabad",
+      "latitude": "33.6938",
+      "longitude": "73.0560",
+      "description": "Fire reported at commercial building"
+    }
+  }'
+```
+
 ### 2.5 Google OAuth (Social Login)
 
 ```json
