@@ -7,7 +7,7 @@ public class VoicePipelineService : IVoicePipeline
     private readonly ISpeechToText _stt;
     private readonly ILanguageModel _llm;
     private readonly ITextToSpeech _tts;
-    private readonly ILogger<VoicePipelineService> _logger;
+    private readonly ILogger<VoicePipelineService>? _logger;
 
     public bool IsMock => _stt.IsMock || _llm.IsMock || _tts.IsMock;
 
@@ -15,7 +15,7 @@ public class VoicePipelineService : IVoicePipeline
         ISpeechToText stt,
         ILanguageModel llm,
         ITextToSpeech tts,
-        ILogger<VoicePipelineService> logger)
+        ILogger<VoicePipelineService>? logger = null)
     {
         _stt = stt;
         _llm = llm;
@@ -29,10 +29,10 @@ public class VoicePipelineService : IVoicePipeline
         string? systemPrompt = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("ProcessTurnAsync: audioLength={AudioLength}", userAudio.Length);
+        _logger?.LogDebug("ProcessTurnAsync: audioLength={AudioLength}", userAudio.Length);
         
         var transcript = await _stt.TranscribeAsync(userAudio);
-        _logger.LogDebug("STT result: {Transcript}", transcript);
+        _logger?.LogDebug("STT result: {Transcript}", transcript);
         
         if (string.IsNullOrWhiteSpace(transcript))
         {
@@ -45,7 +45,7 @@ public class VoicePipelineService : IVoicePipeline
             systemPrompt,
             cancellationToken);
         
-        _logger.LogDebug("LLM response: {Response}", response.Length > 100 ? response[..100] + "..." : response);
+        _logger?.LogDebug("LLM response: {Response}", response.Length > 100 ? response[..100] + "..." : response);
         return response;
     }
 

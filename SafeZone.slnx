@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="SafeZone.Server/SafeZone.Server.csproj" />
+  <Project Path="SafeZone.Tests/SafeZone.Tests.csproj" />
 </Solution>
