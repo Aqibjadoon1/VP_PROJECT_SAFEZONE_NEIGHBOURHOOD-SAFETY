@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SafeZone.Server.Data;
 using SafeZone.Server.Hubs;
 using SafeZone.Server.Models;
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 namespace SafeZone.Server.Services;
 
@@ -16,19 +20,29 @@ public class VoiceCallService : IVoiceCallService
     private readonly IHubContext<CallHub> _callHub;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<VoiceCallService> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly string? _twilioAccountSid;
+    private readonly string? _twilioAuthToken;
+    private readonly string? _twilioFromNumber;
 
-    public bool IsMockMode => true;
+    public bool IsMockMode => string.IsNullOrWhiteSpace(_twilioAccountSid);
 
     public VoiceCallService(
         IVoicePipeline pipeline,
         IHubContext<CallHub> callHub,
         IServiceScopeFactory serviceScopeFactory,
-        ILogger<VoiceCallService> logger)
+        ILogger<VoiceCallService> logger,
+        IConfiguration configuration,
+        HttpClient? httpClient = null)
     {
         _pipeline = pipeline;
         _callHub = callHub;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _httpClient = httpClient ?? new HttpClient();
+        _twilioAccountSid = configuration["Twilio:AccountSid"];
+        _twilioAuthToken = configuration["Twilio:AuthToken"];
+        _twilioFromNumber = configuration["Twilio:FromNumber"];
     }
 
     public async Task<CallSession> StartOutboundCallAsync(
@@ -38,7 +52,7 @@ public class VoiceCallService : IVoiceCallService
         CancellationToken cancellationToken = default)
     {
         var callId = Guid.NewGuid();
-        
+
         var session = new CallSession
         {
             CallId = callId,
@@ -48,18 +62,104 @@ public class VoiceCallService : IVoiceCallService
             CreatedAt = DateTime.UtcNow,
             SystemPrompt = systemPrompt ?? GetDefaultEmergencyPrompt(),
             TriggeredByUserId = triggeredByUserId,
-            IsMock = true
+            IsMock = IsMockMode
         };
 
         _activeCalls.TryAdd(callId, session);
-        _logger.LogInformation("Started mock outbound call: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
 
-        _ = RunMockCallLoopAsync(session, cancellationToken);
+        if (IsMockMode)
+        {
+            _logger.LogInformation("Started mock outbound call: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
+            _ = RunMockCallLoopAsync(session, cancellationToken);
+        }
+        else
+        {
+            _logger.LogInformation("Starting live Twilio call: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
+            _ = RunTwilioCallLoopAsync(session, cancellationToken);
+        }
 
         await BroadcastCallStatusAsync(session);
         await BroadcastNewCallToAuthoritiesAsync(session);
 
         return session;
+    }
+
+    private async Task RunTwilioCallLoopAsync(CallSession session, CancellationToken cancellationToken)
+    {
+        try
+        {
+            session.Status = CallStatus.Ringing;
+            var twilioSid = await PlaceTwilioCallAsync(session.RemoteNumber!, cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(twilioSid))
+            {
+                _logger.LogWarning("Twilio call placement failed — falling back to mock for CallId={CallId}", session.CallId);
+                await RunMockCallLoopAsync(session, cancellationToken);
+                return;
+            }
+
+            await BroadcastCallStatusAsync(session);
+
+            await Task.Delay(1200, cancellationToken);
+            session.Status = CallStatus.Answered;
+            session.ConnectedAt = DateTime.UtcNow;
+            await BroadcastCallStatusAsync(session);
+
+            var openingMessage = "Hello, this is the SafeZone Emergency Assistant calling. We have a report of an emergency at your location.";
+            session.Transcript.Add(new TranscriptSegment
+            {
+                Speaker = SpeakerRole.Agent,
+                Text = openingMessage,
+                Timestamp = DateTime.UtcNow
+            });
+            session.ConversationHistory.Add(new ChatMessage(ChatRole.Assistant, openingMessage));
+            await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, openingMessage);
+
+            _logger.LogInformation("Twilio call connected: CallId={CallId}, Sid={Sid}", session.CallId, twilioSid);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Twilio call failed — falling back to mock for CallId={CallId}", session.CallId);
+            await RunMockCallLoopAsync(session, cancellationToken);
+            return;
+        }
+
+        await RunMockCallLoopAsync(session, cancellationToken);
+    }
+
+    private async Task<string?> PlaceTwilioCallAsync(string phoneNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var url = $"https://api.twilio.com/2010-04-01/Accounts/{_twilioAccountSid}/Calls.json";
+            var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_twilioAccountSid}:{_twilioAuthToken}"));
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
+
+            var payload = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["To"] = phoneNumber,
+                ["From"] = _twilioFromNumber!,
+                ["Url"] = "https://demo.twilio.com/welcome/voice/",
+                ["Method"] = "GET"
+            });
+
+            var response = await _httpClient.PostAsync(url, payload, cancellationToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Twilio API rejected call: {StatusCode} — {Body}", (int)response.StatusCode, content);
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(content);
+            return doc.RootElement.GetProperty("sid").GetString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Twilio HTTP call failed: {Message}", ex.Message);
+            return null;
+        }
     }
 
     private string GetDefaultEmergencyPrompt()

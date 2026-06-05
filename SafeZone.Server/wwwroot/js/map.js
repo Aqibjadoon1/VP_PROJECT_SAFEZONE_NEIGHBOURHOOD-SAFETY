@@ -4,6 +4,7 @@
     const maps = {};
     const markers = {};
     const heatmapLayers = {};
+    const markerClusters = {};
 
     const DEFAULT_CENTER = { lat: 33.6844, lng: 73.0479 };
     const DEFAULT_ZOOM = 13;
@@ -229,7 +230,55 @@
         }
     }
 
-    function fitBounds(containerId, incidents) {
+    function addClusteredIncidentMarkers(containerId, incidents) {
+        clearMarkerCluster(containerId);
+        if (!Array.isArray(incidents) || incidents.length === 0) return;
+
+        const map = maps[containerId];
+        const L = window.L;
+        if (!map || !L || !L.markerClusterGroup) return;
+
+        const clusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            iconCreateFunction: function (cluster) {
+                var count = cluster.getChildCount();
+                var sizeClass = count < 10 ? 'small' : count < 50 ? 'medium' : 'large';
+                var size = count < 10 ? 36 : count < 50 ? 44 : 52;
+                return L.divIcon({
+                    html: '<div style="width:' + size + 'px;height:' + size + 'px;background:rgba(0,255,136,0.22);border:2px solid #00FF88;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:' + (count < 10 ? 12 : 14) + 'px;box-shadow:0 0 20px rgba(0,255,136,0.3);">' + count + '</div>',
+                    className: 'marker-cluster marker-cluster-' + sizeClass,
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2]
+                });
+            }
+        });
+
+        incidents.map(normalizeIncident)
+            .filter(i => Number.isFinite(i.lat) && Number.isFinite(i.lng))
+            .forEach(incident => {
+                var marker = createMarker(incident.lat, incident.lng, {
+                    color: getSeverityColor(incident.severity),
+                    icon: getStatusIcon(incident.status),
+                    popup: createIncidentPopup(incident),
+                    data: incident
+                });
+                if (marker) clusterGroup.addLayer(marker);
+            });
+
+        map.addLayer(clusterGroup);
+        markerClusters[containerId] = clusterGroup;
+    }
+
+    function clearMarkerCluster(containerId) {
+        var map = maps[containerId];
+        if (map && markerClusters[containerId]) {
+            map.removeLayer(markerClusters[containerId]);
+            delete markerClusters[containerId];
+        }
+    }
         const map = maps[containerId];
         const L = window.L;
         if (!map || !L || !Array.isArray(incidents) || incidents.length === 0) return;
@@ -356,6 +405,8 @@
         addMarker,
         clearMarkers,
         addIncidentMarkers,
+        addClusteredIncidentMarkers,
+        clearMarkerCluster,
         panTo,
         fitBounds,
         enableLocationPicker,

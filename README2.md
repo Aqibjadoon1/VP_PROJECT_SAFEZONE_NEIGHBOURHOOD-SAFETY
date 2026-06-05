@@ -915,3 +915,75 @@ Edit `appsettings.Development.json` to configure:
 ---
 
 *Project for CS-284L Visual Programming Lab — Air University Islamabad — Spring 2026*
+
+---
+
+## Shared Component Usage Guide
+
+### GlassCard
+```razor
+<GlassCard Title="Card Title" Class="p-4" Style="border-radius: 16px;">
+    <p>Card content here</p>
+</GlassCard>
+```
+Props: `Title` (string), `Class` (string), `Style` (string), `ChildContent` (RenderFragment). Renders a glassmorphism card with optional header.
+
+### MetricCard
+```razor
+<MetricCard Label="Total Reports" Value="42" Accent="primary" />
+```
+Props: `Label`, `Value`, `Accent` (primary/success/warning/danger/purple), `Change` (optional int), `Icon` (optional string). Staggered entrance animation with circular accent icon.
+
+### PageHeader
+```razor
+<PageHeader Title="Dashboard" Subtitle="Overview of activity">
+    <Actions>
+        <button class="btn btn-primary btn-sm">Action</button>
+    </Actions>
+</PageHeader>
+```
+Props: `Title`, `Subtitle`, `Actions` (RenderFragment). Renders page title with optional action buttons.
+
+### StatusChip / SeverityChip
+```razor
+<StatusChip Status="Active" />
+<SeverityChip Severity="High" />
+```
+Display colored chips for status/severity indicators.
+
+### Toast
+```razor
+@inject ToastService ToastSvc
+// In code:
+ToastSvc.Show("Operation completed", "success");
+```
+Types: success, warning, error, info. Auto-dismiss 4s, max 5 visible.
+
+### LoadingSkeleton
+```razor
+<LoadingSkeleton Type="card" />
+<LoadingSkeleton Type="page" />
+<LoadingSkeleton Type="stats" />
+```
+Types: card, page, stats, text. Provides animated skeleton placeholders during data loading.
+
+### ConfirmDialog
+```razor
+<ConfirmDialog Show="showConfirm" Title="Confirm Action" Message="Are you sure?"
+    OnConfirm="HandleConfirm" OnCancel="() => showConfirm = false" />
+```
+Props: `Show`, `Title`, `Message`, `OnConfirm`, `OnCancel`, `ConfirmText`, `CancelText`.
+
+### EmptyState
+```razor
+<EmptyState Icon="📭" Title="No Items" Message="Nothing to display" />
+```
+### IncidentCard
+```razor
+<IncidentCard Incident="incident" />
+```
+### StatCard
+```razor
+<StatCard Title="Active" Value="12" Color="#00FF88" />
+```
+

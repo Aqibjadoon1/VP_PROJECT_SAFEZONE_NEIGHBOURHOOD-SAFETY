@@ -23,7 +23,7 @@ public class IncidentService : IIncidentService
         var incident = new Incident
         {
             IncidentId = Guid.NewGuid(),
-            IncidentNumber = GenerateIncidentNumber(),
+            IncidentNumber = await GenerateIncidentNumberAsync(),
             CategoryId = dto.CategoryId,
             ReporterId = dto.IsAnonymous ? null : reporterId,
             Latitude = dto.Latitude,
@@ -284,11 +284,29 @@ public class IncidentService : IIncidentService
             .ToDictionaryAsync(x => x.Severity, x => x.Count);
     }
 
+    private static readonly SemaphoreSlim _numberLock = new(1, 1);
+    private static int _sequenceCounter;
+
     private string GenerateIncidentNumber()
     {
         var timestamp = DateTime.UtcNow;
         var random = new Random().Next(1000, 9999);
         return $"INC-{timestamp:yyyyMMdd}-{random}";
+    }
+
+    private async Task<string> GenerateIncidentNumberAsync()
+    {
+        await _numberLock.WaitAsync();
+        try
+        {
+            var timestamp = DateTime.UtcNow;
+            var seq = Interlocked.Increment(ref _sequenceCounter) % 10000;
+            return $"INC-{timestamp:yyyyMMdd}-{seq:D4}";
+        }
+        finally
+        {
+            _numberLock.Release();
+        }
     }
 
     private IncidentResponseDto MapToResponse(Incident incident, IncidentCategory category)

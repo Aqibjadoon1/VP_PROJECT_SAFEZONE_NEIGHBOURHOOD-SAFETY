@@ -2,6 +2,11 @@ namespace SafeZone.Server.Services;
 
 public class MockSttService : ISpeechToText
 {
+    public MockSttService()
+    {
+        Console.WriteLine("[MockSttService] WARNING: Using mock STT — no real speech-to-text API configured.");
+    }
+
     private static readonly string[] _mockTranscripts = new[]
     {
         "Help, there's an emergency!",

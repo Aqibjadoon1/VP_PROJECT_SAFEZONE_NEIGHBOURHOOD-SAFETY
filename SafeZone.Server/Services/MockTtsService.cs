@@ -2,6 +2,11 @@ namespace SafeZone.Server.Services;
 
 public class MockTtsService : ITextToSpeech
 {
+    public MockTtsService()
+    {
+        Console.WriteLine("[MockTtsService] WARNING: Using mock TTS — no real text-to-speech API configured.");
+    }
+
     public int SampleRate => 16000;
     public int Channels => 1;
     public bool IsMock => true;

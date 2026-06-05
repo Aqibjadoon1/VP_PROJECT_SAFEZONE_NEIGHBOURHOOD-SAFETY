@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SafeZone.Server.Helpers;
 
 namespace SafeZone.Server.Services;
 
@@ -109,12 +110,15 @@ namespace SafeZone.Server.Services;
 
             _logger?.LogDebug("Calling Groq API with {MessageCount} messages", messages.Count);
 
-            var response = await _httpClient.PostAsync(
-                $"{_endpoint}/chat/completions",
-                content,
-                cancellationToken);
-
-            response.EnsureSuccessStatusCode();
+            var response = await RetryHelper.WithRetryAsync(async ct =>
+            {
+                var resp = await _httpClient.PostAsync(
+                    $"{_endpoint}/chat/completions",
+                    content,
+                    ct);
+                resp.EnsureSuccessStatusCode();
+                return resp;
+            }, 3, 500, cancellationToken);
 
             var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
             var result = JsonSerializer.Deserialize<GroqChatResponse>(responseJson, JsonOptions);

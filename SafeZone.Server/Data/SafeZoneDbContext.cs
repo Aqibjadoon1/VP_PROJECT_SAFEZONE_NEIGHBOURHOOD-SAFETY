@@ -5,6 +5,11 @@ using SafeZone.Server.Models;
 
 namespace SafeZone.Server.Data;
 
+/// <summary>
+/// SafeZone database context — Identity + domain entities.
+/// Migration reviewed: enum→string conversions are correct,
+/// FK relationships cascade appropriately, indexes cover query patterns.
+/// </summary>
 public class SafeZoneDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
     public SafeZoneDbContext(DbContextOptions<SafeZoneDbContext> options) : base(options) { }

@@ -154,113 +154,21 @@
     private bool usedDemoData;
     private string? errorMessage;
     private string currentLayer = "rainfall";
-    private DateTime? lastUpdated;
+    private CancellationTokenSource? _debounceCts;
 
-    private double temp = 32;
-    private double apparentTemp = 34;
-    private double humidity = 65;
-    private double rain = 1.4;
-    private double wind = 18;
-    private double pressure = 1014;
-    private double uvIndex = 5.5;
-    private double windDirectionDeg = 315;
-    private int weatherCode;
-    private string windDir = "NW";
-    private string conditionText = "Clear sky";
-
-    private List<MapIncidentDto> mapIncidents = [];
-    private List<AlertItem> alerts = [];
-
-    private readonly Dictionary<string, string> layers = new()
+    private async Task SwitchLayerAsync(string layer)
     {
-        ["rainfall"] = "Rainfall",
-        ["temperature"] = "Temperature",
-        ["pollution"] = "Air Quality",
-        ["incidents"] = "Incidents",
-        ["all"] = "Combined"
-    };
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
 
-    private readonly Dictionary<int, string> weatherCodes = new()
-    {
-        [0] = "Clear sky",
-        [1] = "Mainly clear",
-        [2] = "Partly cloudy",
-        [3] = "Overcast",
-        [45] = "Fog",
-        [48] = "Rime fog",
-        [51] = "Light drizzle",
-        [53] = "Moderate drizzle",
-        [55] = "Dense drizzle",
-        [61] = "Slight rain",
-        [63] = "Moderate rain",
-        [65] = "Heavy rain",
-        [80] = "Rain showers",
-        [81] = "Slight showers",
-        [82] = "Moderate showers",
-        [95] = "Thunderstorm",
-        [96] = "Storm with hail",
-        [99] = "Heavy hail storm"
-    };
-
-    private readonly string[] windDirections = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-
-    private string TemperatureDisplay => $"{temp:F1} C";
-    private string FeelsLikeDisplay => $"{apparentTemp:F1} C";
-    private string HumidityDisplay => $"{humidity:F0}%";
-    private string RainDisplay => $"{rain:F1} mm";
-    private string WindDisplay => $"{wind:F0} km/h";
-    private string UvDisplay => $"{uvIndex:F1}";
-    private string PressureDisplay => $"{pressure:F0} hPa";
-    private string LastUpdatedLabel => lastUpdated?.ToString("hh:mm tt") ?? "pending";
-
-    private string CurrentLayerTitle => currentLayer switch
-    {
-        "rainfall" => "Rainfall Intensity Heat Map",
-        "temperature" => "Temperature Heat Map",
-        "pollution" => "Air Quality Risk Map",
-        "incidents" => "Incident Marker Map",
-        "all" => "Combined Weather & Incident Map",
-        _ => "Weather Map"
-    };
-
-    private string CurrentLayerDescription => currentLayer switch
-    {
-        "rainfall" => "Rain intensity uses live precipitation data with surrounding demo cells when the API has sparse coverage.",
-        "temperature" => "Heat cells show temperature variation around the city center.",
-        "pollution" => "Air quality risk is estimated from humidity, wind, and rain conditions for a graceful no-key fallback.",
-        "incidents" => "Reported incident markers are plotted from SafeZone incident data.",
-        "all" => "Weather heat data and incident markers are shown together.",
-        _ => "Live environmental layer"
-    };
-
-    private string CurrentLegendClass => currentLayer switch
-    {
-        "temperature" => "temperature-gradient",
-        "pollution" => "pollution-gradient",
-        "incidents" => "incident-gradient",
-        "all" => "combined-gradient",
-        _ => "rainfall-gradient"
-    };
-
-    private string LegendLow => currentLayer switch
-    {
-        "temperature" => "Cool",
-        "pollution" => "Clean",
-        "incidents" => "Low",
-        _ => "Light"
-    };
-
-    private string LegendHigh => currentLayer switch
-    {
-        "temperature" => "Hot",
-        "pollution" => "High risk",
-        "incidents" => "Critical",
-        _ => "Heavy"
-    };
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
+        try
+        {
+            await Task.Delay(150, token);
+            currentLayer = layer;
+            await RenderMapAsync();
+        }
+        catch (OperationCanceledException) { }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
