@@ -1,0 +1,230 @@
+# SafeZone Configuration Guide
+
+## Quick Start
+
+```bash
+cd SafeZone.Server
+dotnet run --launch-profile https
+```
+Opens at `https://localhost:7026`. Swagger at `/swagger`.
+
+---
+
+## 1. appsettings.json — Core Configuration
+
+**File:** `SafeZone.Server/appsettings.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "SqliteConnection": "Data Source=SafeZone.db"
+  },
+  "Jwt": {
+    "Key": "YOUR_32_CHAR_MINIMUM_SECRET_KEY_HERE",
+    "Issuer": "SafeZone",
+    "Audience": "SafeZoneClient",
+    "ExpiryMinutes": 15
+  }
+}
+```
+
+| Setting | What It Does | Required? |
+|---------|-------------|-----------|
+| `SqliteConnection` | SQLite database file path | Yes — auto-created on first run |
+| `Jwt:Key` | JWT signing key (min 32 chars) | Yes — used for all auth tokens |
+| `Jwt:Issuer` | Token issuer name | Yes |
+| `Jwt:Audience` | Token audience name | Yes |
+| `Jwt:ExpiryMinutes` | How long JWT tokens last | Yes |
+
+---
+
+## 2. appsettings.Development.json — Optional Services
+
+**File:** `SafeZone.Server/appsettings.Development.json`
+
+All services in this file are **opt-in**. Leave them empty and the app runs in full simulation mode.
+
+### 2.1 SMTP Email (Gmail / any provider)
+
+```json
+"Smtp": {
+  "Host": "smtp.gmail.com",
+  "Port": 587,
+  "FromEmail": "youraccount@gmail.com",
+  "User": "youraccount@gmail.com",
+  "Password": "your_app_password_here"
+}
+```
+
+| Setting | Example | Notes |
+|---------|---------|-------|
+| `Host` | `smtp.gmail.com` | SMTP server hostname |
+| `Port` | `587` | 587 for TLS, 465 for SSL |
+| `FromEmail` | `alerts@yourdomain.com` | Sender address |
+| `User` | `you@gmail.com` | SMTP login (usually = FromEmail) |
+| `Password` | `xxxx xxxx xxxx xxxx` | **Gmail:** Use [App Password](https://myaccount.google.com/apppasswords), not your real password |
+
+**Where emails are sent:**
+- FIR status changes (Accepted/Rejected)
+- Incident alerts to residents
+- Emergency notifications
+
+**Leave `Host` empty to disable email entirely.** The app logs "[Gmail] SMTP not configured" and continues normally.
+
+### 2.2 Slack Webhook
+
+```json
+"Slack": {
+  "WebhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/xxxxxxxxxxxxxxxx"
+}
+```
+
+| Setting | Notes |
+|---------|-------|
+| `WebhookUrl` | Full Slack incoming webhook URL |
+
+**How to get it:**
+1. Go to `https://api.slack.com/apps`
+2. Create App → Incoming Webhooks → Activate
+3. Copy the webhook URL
+4. Posts go to `#authority-alerts` channel
+
+**Leave empty to disable.** Critical incidents and SOS alerts post to Slack when configured.
+
+### 2.3 Groq LLM (AI Emergency Scripts)
+
+```json
+"Groq": {
+  "ApiKey": "gsk_your_groq_api_key_here",
+  "ModelName": "llama-3.1-8b-instant",
+  "Endpoint": "https://api.groq.com/openai/v1"
+}
+```
+
+| Setting | Notes |
+|---------|-------|
+| `ApiKey` | From [console.groq.com](https://console.groq.com) |
+| `ModelName` | Any Groq-supported model |
+| `Endpoint` | Groq API base URL |
+
+**Leave `ApiKey` empty** to use built-in keyword-based mock LLM.
+
+### 2.4 Google OAuth (Social Login)
+
+```json
+"Authentication": {
+  "Google": {
+    "ClientId": "your-client-id.apps.googleusercontent.com",
+    "ClientSecret": "GOCSPX-xxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
+
+**How to get it:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. APIs & Services → Credentials → Create OAuth 2.0 Client ID
+3. Add `https://localhost:7026/external-login-callback` as redirect URI
+
+**Leave empty to disable Google login.**
+
+---
+
+## 3. User Secrets (Recommended for Production)
+
+Never commit real API keys to git. Use User Secrets:
+
+```bash
+cd SafeZone.Server
+dotnet user-secrets set "Smtp:Password" "your-real-password"
+dotnet user-secrets set "Groq:ApiKey" "gsk_real_key"
+dotnet user-secrets set "Slack:WebhookUrl" "https://hooks.slack.com/services/..."
+dotnet user-secrets set "Jwt:Key" "your-real-32-char-secret"
+```
+
+User secrets override `appsettings.json` at runtime.
+
+---
+
+## 4. Test Accounts (Pre-Seeded)
+
+These users exist automatically on first run:
+
+| Role | Phone | Password | Access |
+|------|-------|----------|--------|
+| SuperAdmin | +92511234567 | Admin123! | Everything + user management |
+| Authority | +92511112233 | Officer123! | Authority dashboard + FIR review |
+| Resident | +923001234567 | User123! | Report incidents + SOS |
+
+---
+
+## 5. Database
+
+**SQLite — zero configuration needed.**
+
+On first run, the database is auto-created at `SafeZone.Server/SafeZone.db` and seeded with:
+- 4 roles (Resident, Authority, Admin, SuperAdmin)
+- 15 incident categories
+- 3 test users
+- 5 sample incidents
+
+To reset: delete `SafeZone.db` and restart. It auto-recreates.
+
+---
+
+## 6. Running the App
+
+### Development
+```bash
+cd SafeZone.Server
+dotnet run
+# → http://localhost:5002 (HTTP)
+# → https://localhost:7026 (HTTPS)
+# Swagger: /swagger
+```
+
+### Production Publish
+```bash
+dotnet publish -c Release -o ./publish
+cd publish
+dotnet SafeZone.Server.dll --urls "http://0.0.0.0:5000"
+```
+
+### Deploy to Azure App Service
+```bash
+dotnet publish -c Release -o ./publish
+# Deploy ./publish folder to Azure App Service (Windows)
+# Set WEBSITE_WEBDEPLOY_USE_SCM=false in App Settings
+```
+
+---
+
+## 7. What Works Out of the Box (No Config Needed)
+
+Everything below runs in **simulation/mock mode** with zero API keys:
+
+- Incident reporting & management
+- Kanban board with status transitions
+- Live dispatch map with clustered markers
+- SOS emergency system
+- FIR filing & review workflow
+- Weather & heat map
+- Voice call simulation (no real calls made)
+- Auth (phone + password, cookie + JWT)
+- Audit logging
+- File upload (local filesystem)
+- PDF generation for FIR reports
+- Real-time SignalR notifications
+- Analytics endpoints
+
+---
+
+## 8. Quick Checklist
+
+| Feature | What to Configure | Where |
+|---------|------------------|-------|
+| [ ] JWT Auth | Set `Jwt:Key` to 32+ chars | `appsettings.json` |
+| [ ] Email | Set `Smtp:Host/User/Password` | `appsettings.Development.json` |
+| [ ] Slack | Set `Slack:WebhookUrl` | `appsettings.Development.json` |
+| [ ] AI LLM | Set `Groq:ApiKey` | `appsettings.Development.json` |
+| [ ] Google Login | Set `Authentication:Google:ClientId/Secret` | `appsettings.Development.json` |
+| [ ] Production Deploy | Move all secrets to User Secrets / Environment Variables | `dotnet user-secrets` |
