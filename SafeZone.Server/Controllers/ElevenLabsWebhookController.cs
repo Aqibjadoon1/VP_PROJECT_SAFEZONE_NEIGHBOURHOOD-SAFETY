@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
 using SafeZone.Server.DTOs;
 using SafeZone.Server.Hubs;
 using SafeZone.Server.Models;
@@ -34,6 +35,78 @@ public class ElevenLabsWebhookController : ControllerBase
                 "ElevenLabs webhook received. AgentId={AgentId}, ConversationId={ConversationId}, Phone={Phone}",
                 payload.AgentId, payload.ConversationId, payload.CallerPhoneNumber);
 
+            return await ProcessAndCreateIncident(payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process ElevenLabs webhook");
+            return StatusCode(500, new ElevenLabsWebhookResponse
+            {
+                Success = false,
+                Message = $"Processing failed: {ex.Message}"
+            });
+        }
+    }
+
+    [HttpPost("tool-call")]
+    public async Task<IActionResult> ReceiveToolCall([FromBody] JsonElement rawPayload)
+    {
+        try
+        {
+            _logger.LogInformation("ElevenLabs tool call received: {Payload}", rawPayload.ToString());
+
+            var agentId = "";
+            var conversationId = "";
+            string? callerPhone = null;
+            Dictionary<string, string>? dynamicVars = null;
+
+            if (rawPayload.TryGetProperty("agent_id", out var aid))
+                agentId = aid.GetString() ?? "";
+
+            if (rawPayload.TryGetProperty("conversation_id", out var cid))
+                conversationId = cid.GetString() ?? "";
+
+            if (rawPayload.TryGetProperty("caller_phone_number", out var phone))
+                callerPhone = phone.GetString();
+
+            if (rawPayload.TryGetProperty("arguments", out var args))
+            {
+                var argsStr = args.ValueKind == JsonValueKind.String
+                    ? args.GetString() ?? "{}"
+                    : args.ToString();
+                dynamicVars = JsonSerializer.Deserialize<Dictionary<string, string>>(argsStr);
+            }
+
+            if (rawPayload.TryGetProperty("dynamic_variables", out var dv))
+            {
+                dynamicVars = JsonSerializer.Deserialize<Dictionary<string, string>>(dv.ToString());
+            }
+
+            var payload = new ElevenLabsWebhookPayload
+            {
+                AgentId = agentId,
+                ConversationId = conversationId,
+                CallerPhoneNumber = callerPhone,
+                DynamicVariables = dynamicVars
+            };
+
+            return await ProcessAndCreateIncident(payload);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process ElevenLabs tool call");
+            return StatusCode(500, new ElevenLabsWebhookResponse
+            {
+                Success = false,
+                Message = $"Tool call processing failed: {ex.Message}"
+            });
+        }
+    }
+
+    private async Task<IActionResult> ProcessAndCreateIncident(ElevenLabsWebhookPayload payload)
+    {
+        try
+        {
             var dynamicVars = ResolveDynamicVariables(payload);
             var categoryId = await ResolveCategoryAsync(dynamicVars.Category, payload);
             var title = ResolveTitle(dynamicVars.Category);
