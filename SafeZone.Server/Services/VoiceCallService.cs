@@ -1,15 +1,11 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SafeZone.Server.Data;
 using SafeZone.Server.Hubs;
 using SafeZone.Server.Models;
 using System.Collections.Concurrent;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 
 namespace SafeZone.Server.Services;
 
@@ -20,29 +16,19 @@ public class VoiceCallService : IVoiceCallService
     private readonly IHubContext<CallHub> _callHub;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<VoiceCallService> _logger;
-    private readonly HttpClient _httpClient;
-    private readonly string? _twilioAccountSid;
-    private readonly string? _twilioAuthToken;
-    private readonly string? _twilioFromNumber;
 
-    public bool IsMockMode => string.IsNullOrWhiteSpace(_twilioAccountSid);
+    public bool IsMockMode => true;
 
     public VoiceCallService(
         IVoicePipeline pipeline,
         IHubContext<CallHub> callHub,
         IServiceScopeFactory serviceScopeFactory,
-        ILogger<VoiceCallService> logger,
-        IConfiguration configuration,
-        HttpClient? httpClient = null)
+        ILogger<VoiceCallService> logger)
     {
         _pipeline = pipeline;
         _callHub = callHub;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
-        _httpClient = httpClient ?? new HttpClient();
-        _twilioAccountSid = configuration["Twilio:AccountSid"];
-        _twilioAuthToken = configuration["Twilio:AuthToken"];
-        _twilioFromNumber = configuration["Twilio:FromNumber"];
     }
 
     public async Task<CallSession> StartOutboundCallAsync(
@@ -52,7 +38,7 @@ public class VoiceCallService : IVoiceCallService
         CancellationToken cancellationToken = default)
     {
         var callId = Guid.NewGuid();
-
+        
         var session = new CallSession
         {
             CallId = callId,
@@ -62,21 +48,13 @@ public class VoiceCallService : IVoiceCallService
             CreatedAt = DateTime.UtcNow,
             SystemPrompt = systemPrompt ?? GetDefaultEmergencyPrompt(),
             TriggeredByUserId = triggeredByUserId,
-            IsMock = IsMockMode
+            IsMock = true
         };
 
         _activeCalls.TryAdd(callId, session);
+        _logger.LogInformation("Started emergency call simulation: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
 
-        if (IsMockMode)
-        {
-            _logger.LogInformation("Started mock outbound call: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
-            _ = RunMockCallLoopAsync(session, cancellationToken);
-        }
-        else
-        {
-            _logger.LogInformation("Starting live Twilio call: CallId={CallId}, Number={PhoneNumber}", callId, phoneNumber);
-            _ = RunTwilioCallLoopAsync(session, cancellationToken);
-        }
+        _ = RunCallLoopAsync(session, cancellationToken);
 
         await BroadcastCallStatusAsync(session);
         await BroadcastNewCallToAuthoritiesAsync(session);
@@ -84,190 +62,75 @@ public class VoiceCallService : IVoiceCallService
         return session;
     }
 
-    private async Task RunTwilioCallLoopAsync(CallSession session, CancellationToken cancellationToken)
+    private static string GetDefaultEmergencyPrompt()
+    {
+        return "You are the SafeZone AI Emergency Assistant. Be professional, calm, and clear. Gather critical information: location, people involved, hazards, medical conditions.";
+    }
+
+    private async Task RunCallLoopAsync(CallSession session, CancellationToken ct)
     {
         try
         {
+            await Task.Delay(800, ct);
             session.Status = CallStatus.Ringing;
-            var twilioSid = await PlaceTwilioCallAsync(session.RemoteNumber!, cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(twilioSid))
-            {
-                _logger.LogWarning("Twilio call placement failed — falling back to mock for CallId={CallId}", session.CallId);
-                await RunMockCallLoopAsync(session, cancellationToken);
-                return;
-            }
-
             await BroadcastCallStatusAsync(session);
 
-            await Task.Delay(1200, cancellationToken);
+            await Task.Delay(1200, ct);
             session.Status = CallStatus.Answered;
             session.ConnectedAt = DateTime.UtcNow;
             await BroadcastCallStatusAsync(session);
 
-            var openingMessage = "Hello, this is the SafeZone Emergency Assistant calling. We have a report of an emergency at your location.";
-            session.Transcript.Add(new TranscriptSegment
-            {
-                Speaker = SpeakerRole.Agent,
-                Text = openingMessage,
-                Timestamp = DateTime.UtcNow
-            });
-            session.ConversationHistory.Add(new ChatMessage(ChatRole.Assistant, openingMessage));
-            await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, openingMessage);
+            var opening = "Hello, this is the SafeZone Emergency Assistant. We have a report of an emergency at your location.";
+            session.Transcript.Add(new() { Speaker = SpeakerRole.Agent, Text = opening, Timestamp = DateTime.UtcNow });
+            session.ConversationHistory.Add(new(ChatRole.Assistant, opening));
+            await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, opening);
 
-            _logger.LogInformation("Twilio call connected: CallId={CallId}, Sid={Sid}", session.CallId, twilioSid);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Twilio call failed — falling back to mock for CallId={CallId}", session.CallId);
-            await RunMockCallLoopAsync(session, cancellationToken);
-            return;
-        }
-
-        await RunMockCallLoopAsync(session, cancellationToken);
-    }
-
-    private async Task<string?> PlaceTwilioCallAsync(string phoneNumber, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var url = $"https://api.twilio.com/2010-04-01/Accounts/{_twilioAccountSid}/Calls.json";
-            var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_twilioAccountSid}:{_twilioAuthToken}"));
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
-
-            var payload = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["To"] = phoneNumber,
-                ["From"] = _twilioFromNumber!,
-                ["Url"] = "https://demo.twilio.com/welcome/voice/",
-                ["Method"] = "GET"
-            });
-
-            var response = await _httpClient.PostAsync(url, payload, cancellationToken);
-            var content = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Twilio API rejected call: {StatusCode} — {Body}", (int)response.StatusCode, content);
-                return null;
-            }
-
-            using var doc = JsonDocument.Parse(content);
-            return doc.RootElement.GetProperty("sid").GetString();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Twilio HTTP call failed: {Message}", ex.Message);
-            return null;
-        }
-    }
-
-    private string GetDefaultEmergencyPrompt()
-    {
-        return "You are the SafeZone AI Emergency Assistant. You are on a call with emergency services. " +
-               "Be professional, calm, and clear. Gather critical information: location, number of people involved, " +
-               "any hazards, medical conditions. Keep responses concise and actionable.";
-    }
-
-    private async Task RunMockCallLoopAsync(CallSession session, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(800, cancellationToken);
-            session.Status = CallStatus.Ringing;
-            await BroadcastCallStatusAsync(session);
-            _logger.LogDebug("Call ringing: {CallId}", session.CallId);
-
-            await Task.Delay(1200, cancellationToken);
-            session.Status = CallStatus.Answered;
-            session.ConnectedAt = DateTime.UtcNow;
-            await BroadcastCallStatusAsync(session);
-            _logger.LogDebug("Call connected: {CallId}", session.CallId);
-
-            var openingMessage = "Hello, this is the SafeZone Emergency Assistant calling. We have a report of an emergency at the caller's location.";
-            session.Transcript.Add(new TranscriptSegment
-            {
-                Speaker = SpeakerRole.Agent,
-                Text = openingMessage,
-                Timestamp = DateTime.UtcNow
-            });
-            session.ConversationHistory.Add(new ChatMessage(ChatRole.Assistant, openingMessage));
-            
-            await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, openingMessage);
-
-            var mockUserInputs = new[]
+            var inputs = new[]
             {
                 "Yes, this is an emergency. There's been an accident.",
                 "Two people are involved. One is unconscious.",
-                "The location is near the main intersection. Coordinates have been sent.",
-                "No, no fire. Just injuries from the collision."
+                "The location is near the main intersection."
             };
 
-            foreach (var userInput in mockUserInputs.Take(3))
+            foreach (var input in inputs)
             {
-                await Task.Delay(1500, cancellationToken);
+                await Task.Delay(1500, ct);
+                session.Transcript.Add(new() { Speaker = SpeakerRole.User, Text = input, Timestamp = DateTime.UtcNow });
+                session.ConversationHistory.Add(new(ChatRole.User, input));
+                await BroadcastTranscriptAsync(session.CallId, SpeakerRole.User, input);
 
-                session.Transcript.Add(new TranscriptSegment
-                {
-                    Speaker = SpeakerRole.User,
-                    Text = userInput,
-                    Timestamp = DateTime.UtcNow
-                });
-                session.ConversationHistory.Add(new ChatMessage(ChatRole.User, userInput));
-                
-                await BroadcastTranscriptAsync(session.CallId, SpeakerRole.User, userInput);
-                _logger.LogDebug("Mock user input: {Input}", userInput);
-
-                var mockAudio = GenerateMockAudio(16000, 2);
-                var aiResponse = await _pipeline.ProcessTurnAsync(
-                    mockAudio,
+                var response = await _pipeline.ProcessTurnAsync(
+                    GenerateSilentAudio(16000, 1.5),
                     session.ConversationHistory,
-                    session.SystemPrompt,
-                    cancellationToken);
+                    session.SystemPrompt, ct);
 
-                if (!string.IsNullOrWhiteSpace(aiResponse))
+                if (!string.IsNullOrWhiteSpace(response))
                 {
-                    session.Transcript.Add(new TranscriptSegment
-                    {
-                        Speaker = SpeakerRole.Agent,
-                        Text = aiResponse,
-                        Timestamp = DateTime.UtcNow
-                    });
-                    session.ConversationHistory.Add(new ChatMessage(ChatRole.Assistant, aiResponse));
-                    
-                    await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, aiResponse);
-                    await BroadcastAgentSpeakingAsync(session.CallId, isSpeaking: true);
-                    await Task.Delay(500, cancellationToken);
-                    await BroadcastAgentSpeakingAsync(session.CallId, isSpeaking: false);
+                    session.Transcript.Add(new() { Speaker = SpeakerRole.Agent, Text = response, Timestamp = DateTime.UtcNow });
+                    session.ConversationHistory.Add(new(ChatRole.Assistant, response));
+                    await BroadcastTranscriptAsync(session.CallId, SpeakerRole.Agent, response);
                 }
             }
 
-            await Task.Delay(1000, cancellationToken);
-            
+            await Task.Delay(1000, ct);
             session.Status = CallStatus.Completed;
             session.EndedAt = DateTime.UtcNow;
-            
             await BroadcastCallStatusAsync(session);
-            await BroadcastCallEndedAsync(session);
-
             await UpdateAICallLogAsync(session);
-
-            _logger.LogInformation("Mock call completed: CallId={CallId}, Duration={Duration}s",
-                session.CallId, (session.EndedAt - session.ConnectedAt)?.TotalSeconds ?? 0);
+            _logger.LogInformation("Call completed: CallId={CallId}", session.CallId);
         }
         catch (OperationCanceledException)
         {
             session.Status = CallStatus.Cancelled;
             session.EndedAt = DateTime.UtcNow;
             await BroadcastCallStatusAsync(session);
-            _logger.LogInformation("Call cancelled: {CallId}", session.CallId);
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Call failed: CallId={CallId}", session.CallId);
             session.Status = CallStatus.Failed;
             session.EndedAt = DateTime.UtcNow;
             await BroadcastCallStatusAsync(session);
-            _logger.LogError(ex, "Mock call failed: {CallId}", session.CallId);
         }
         finally
         {
@@ -275,27 +138,16 @@ public class VoiceCallService : IVoiceCallService
         }
     }
 
-    private byte[] GenerateMockAudio(int sampleRate, double durationSeconds)
+    private static byte[] GenerateSilentAudio(int sampleRate, double seconds)
     {
-        var sampleCount = (int)(sampleRate * durationSeconds);
-        var bytes = new byte[sampleCount * 2];
-        var random = new Random();
-        
-        for (int i = 0; i < sampleCount; i++)
-        {
-            var sample = (short)(random.NextDouble() * 100 - 50);
-            var offset = i * 2;
-            bytes[offset] = (byte)(sample & 0xFF);
-            bytes[offset + 1] = (byte)((sample >> 8) & 0xFF);
-        }
-        
-        return bytes;
+        var count = (int)(sampleRate * seconds);
+        return new byte[count * 2];
     }
 
     public Task<CallSession?> GetCallAsync(Guid callId)
     {
-        _activeCalls.TryGetValue(callId, out var session);
-        return Task.FromResult(session);
+        _activeCalls.TryGetValue(callId, out var s);
+        return Task.FromResult(s);
     }
 
     public Task<List<CallSession>> GetActiveCallsAsync()
@@ -305,23 +157,20 @@ public class VoiceCallService : IVoiceCallService
 
     public async Task EndCallAsync(Guid callId, string? reason = null)
     {
-        if (_activeCalls.TryGetValue(callId, out var session))
+        if (_activeCalls.TryRemove(callId, out var s))
         {
-            session.Status = CallStatus.Completed;
-            session.EndedAt = DateTime.UtcNow;
-            await BroadcastCallStatusAsync(session);
-            await BroadcastCallEndedAsync(session);
-            _activeCalls.TryRemove(callId, out _);
+            s.Status = CallStatus.Completed;
+            s.EndedAt = DateTime.UtcNow;
+            await BroadcastCallStatusAsync(s);
         }
     }
 
     public Task<string?> GetFullTranscriptAsync(Guid callId)
     {
-        if (_activeCalls.TryGetValue(callId, out var session))
+        if (_activeCalls.TryGetValue(callId, out var s))
         {
-            var transcript = string.Join("\n", session.Transcript
-                .Select(t => $"[{t.Speaker}] {t.Text}"));
-            return Task.FromResult<string?>(transcript);
+            var t = string.Join("\n", s.Transcript.Select(x => $"[{x.Speaker}] {x.Text}"));
+            return Task.FromResult<string?>(t);
         }
         return Task.FromResult<string?>(null);
     }
@@ -329,86 +178,35 @@ public class VoiceCallService : IVoiceCallService
     private async Task UpdateAICallLogAsync(CallSession session)
     {
         using var scope = _serviceScopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<SafeZoneDbContext>();
-
-        var log = await dbContext.AICallLogs
+        var db = scope.ServiceProvider.GetRequiredService<SafeZoneDbContext>();
+        var log = await db.AICallLogs
             .OrderByDescending(l => l.InitiatedAt)
-            .FirstOrDefaultAsync(l => 
-                (session.TriggeredByUserId == null || l.TriggeredByUserId == session.TriggeredByUserId) &&
-                l.Status == CallStatus.Completed);
-
-        if (log != null)
+            .FirstOrDefaultAsync(l => l.TriggeredByUserId == session.TriggeredByUserId);
+        if (log != null && session.EndedAt.HasValue && session.ConnectedAt.HasValue)
         {
-            if (session.EndedAt.HasValue && session.ConnectedAt.HasValue)
-            {
-                log.DurationSeconds = (int)(session.EndedAt - session.ConnectedAt).Value.TotalSeconds;
-            }
-            await dbContext.SaveChangesAsync();
+            log.DurationSeconds = (int)(session.EndedAt - session.ConnectedAt).Value.TotalSeconds;
+            await db.SaveChangesAsync();
         }
     }
 
-    private async Task BroadcastCallStatusAsync(CallSession session)
-    {
-        var callGroup = $"call_{session.CallId}";
-        await _callHub.Clients.Group(callGroup).SendAsync("CallStatusUpdated", new
+    private async Task BroadcastCallStatusAsync(CallSession session) =>
+        await _callHub.Clients.Group($"call_{session.CallId}").SendAsync("CallStatusUpdated", new
         {
-            CallId = session.CallId,
-            Status = session.Status.ToString(),
-            RemoteNumber = session.RemoteNumber,
-            Direction = session.Direction.ToString(),
-            session.CreatedAt,
-            session.ConnectedAt,
-            session.EndedAt
+            CallId = session.CallId, Status = session.Status.ToString(),
+            session.RemoteNumber, Direction = session.Direction.ToString(),
+            session.CreatedAt, session.ConnectedAt, session.EndedAt
         });
-    }
 
-    private async Task BroadcastTranscriptAsync(Guid callId, SpeakerRole speaker, string text)
-    {
-        var callGroup = $"call_{callId}";
-        await _callHub.Clients.Group(callGroup).SendAsync("TranscriptSegment", new
+    private async Task BroadcastTranscriptAsync(Guid callId, SpeakerRole speaker, string text) =>
+        await _callHub.Clients.Group($"call_{callId}").SendAsync("TranscriptSegment", new
         {
-            CallId = callId,
-            Speaker = speaker.ToString(),
-            Text = text,
-            Timestamp = DateTime.UtcNow
+            CallId = callId, Speaker = speaker.ToString(), Text = text, Timestamp = DateTime.UtcNow
         });
-    }
 
-    private async Task BroadcastAgentSpeakingAsync(Guid callId, bool isSpeaking)
-    {
-        var callGroup = $"call_{callId}";
-        await _callHub.Clients.Group(callGroup).SendAsync("AgentSpeaking", new
-        {
-            CallId = callId,
-            IsSpeaking = isSpeaking
-        });
-    }
-
-    private async Task BroadcastNewCallToAuthoritiesAsync(CallSession session)
-    {
+    private async Task BroadcastNewCallToAuthoritiesAsync(CallSession session) =>
         await _callHub.Clients.Group(CallHub.AuthoritiesGroup).SendAsync("NewCallStarted", new
         {
-            CallId = session.CallId,
-            RemoteNumber = session.RemoteNumber,
-            Direction = session.Direction.ToString(),
-            session.TriggeredByUserId,
-            Timestamp = session.CreatedAt
+            CallId = session.CallId, session.RemoteNumber, Direction = session.Direction.ToString(),
+            session.TriggeredByUserId, Timestamp = session.CreatedAt
         });
-    }
-
-    private async Task BroadcastCallEndedAsync(CallSession session)
-    {
-        var callGroup = $"call_{session.CallId}";
-        var duration = session.EndedAt.HasValue && session.ConnectedAt.HasValue
-            ? (int)(session.EndedAt - session.ConnectedAt).Value.TotalSeconds
-            : (int?)null;
-
-        await _callHub.Clients.Group(callGroup).SendAsync("CallEnded", new
-        {
-            CallId = session.CallId,
-            Reason = "Mock call completed",
-            DurationSeconds = duration,
-            TranscriptSummary = await GetFullTranscriptAsync(session.CallId)
-        });
-    }
 }
