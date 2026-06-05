@@ -121,7 +121,30 @@ All services in this file are **opt-in**. Leave them empty and the app runs in f
 
 **Leave `ApiKey` empty** to use built-in keyword-based mock LLM.
 
-### 2.4 Google OAuth (Social Login)
+### 2.4 ElevenLabs Voice Agent Widget
+
+The landing page includes a floating voice agent widget that lets visitors speak to the SafeZone AI assistant. When a call completes, ElevenLabs sends a webhook to `POST /api/elevenlabswebhook` which creates an incident automatically.
+
+**Widget configuration — `Pages/_Host.cshtml`:**
+```html
+<elevenlabs-convai agent-id="YOUR_AGENT_ID_HERE"></elevenlabs-convai>
+```
+
+| Setting | Notes |
+|---------|-------|
+| `agent-id` | Your ElevenLabs Convai agent ID (get from [elevenlabs.io](https://elevenlabs.io)) |
+
+**Webhook flow:**
+1. User calls via ElevenLabs widget
+2. ElevenLabs sends POST to `https://your-server.com/api/elevenlabswebhook`
+3. Webhook parses `dynamic_variables` (category, severity, location, description)
+4. Creates incident in database
+5. Broadcasts via SignalR MapHub → `ReportNewIncident`
+6. Falls back to "Suspicious Activity" / Medium severity / Islamabad coords if fields missing
+
+**No API key needed** — the widget auto-initializes from the agent-id in the HTML. The webhook is public (no auth required, but should be restricted to ElevenLabs IP ranges in production).
+
+### 2.5 Google OAuth (Social Login)
 
 ```json
 "Authentication": {
