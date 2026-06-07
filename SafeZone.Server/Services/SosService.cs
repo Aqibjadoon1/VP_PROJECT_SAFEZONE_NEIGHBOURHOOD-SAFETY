@@ -10,6 +10,8 @@ namespace SafeZone.Server.Services;
     private readonly SafeZoneDbContext _context;
     private readonly IConfiguration _config;
     private readonly IVoiceCallService _voiceCallService;
+    private readonly IGmailNotificationService? _gmail;
+    private readonly ISlackNotificationService? _slack;
 
      public bool IsMockMode {
         get {
@@ -38,11 +40,15 @@ namespace SafeZone.Server.Services;
     public SosService(
         SafeZoneDbContext context, 
         IConfiguration config,
-        IVoiceCallService voiceCallService)
+        IVoiceCallService voiceCallService,
+        IGmailNotificationService? gmail = null,
+        ISlackNotificationService? slack = null)
     {
         _context = context;
         _config = config;
         _voiceCallService = voiceCallService;
+        _gmail = gmail;
+        _slack = slack;
     }
 
      public async Task<SosResponseDto> TriggerEmergencyAsync(TriggerSosDto dto, Guid userId)
@@ -110,6 +116,19 @@ namespace SafeZone.Server.Services;
 
          _context.AICallLogs.Add(callLog);
         await _context.SaveChangesAsync();
+
+        if (_gmail != null && user.PhoneNumber != null)
+        {
+            _ = _gmail.SendIncidentAlertAsync(user.PhoneNumber, $"SOS: {emergencyName}", "Critical");
+        }
+
+        if (_slack != null)
+        {
+            _ = _slack.SendAlertAsync(
+                $"SOS EMERGENCY: {emergencyName}",
+                $"SOS triggered by {user.FullName} ({user.PhoneNumber}). Location: ({dto.Latitude:F4}, {dto.Longitude:F4}). AI Script: {aiScript[..Math.Min(aiScript.Length, 200)]}",
+                "Critical");
+        }
 
         if (IsMockMode)
         {

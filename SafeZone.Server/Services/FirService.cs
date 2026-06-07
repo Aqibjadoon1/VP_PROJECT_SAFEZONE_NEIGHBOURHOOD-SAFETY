@@ -9,11 +9,13 @@ public class FirService : IFirService
 {
     private readonly SafeZoneDbContext _context;
     private readonly IGmailNotificationService? _gmail;
+    private readonly ISlackNotificationService? _slack;
 
-    public FirService(SafeZoneDbContext context, IGmailNotificationService? gmail = null)
+    public FirService(SafeZoneDbContext context, IGmailNotificationService? gmail = null, ISlackNotificationService? slack = null)
     {
         _context = context;
         _gmail = gmail;
+        _slack = slack;
     }
 
     public async Task<FirResponseDto> CreateFirAsync(CreateFirDto dto, Guid reporterId)
@@ -143,6 +145,14 @@ public class FirService : IFirService
             {
                 _ = _gmail.SendFirStatusEmailAsync(reporter.PhoneNumber, fir.FIRNumber, status.ToString());
             }
+        }
+
+        if (_slack != null && (status == FIRStatus.Accepted || status == FIRStatus.Rejected))
+        {
+            _ = _slack.SendAlertAsync(
+                $"FIR {fir.FIRNumber} — {status}",
+                $"FIR #{fir.FIRNumber} has been {status.ToString().ToLowerInvariant()} by authority.",
+                status == FIRStatus.Rejected ? "High" : "Medium");
         }
 
         return await MapToResponseAsync(fir);

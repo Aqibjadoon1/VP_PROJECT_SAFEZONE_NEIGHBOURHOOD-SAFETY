@@ -8,8 +8,8 @@
 
     const DEFAULT_CENTER = { lat: 33.6844, lng: 73.0479 };
     const DEFAULT_ZOOM = 13;
-    const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
     function initMap(containerId, options = {}) {
         const element = document.getElementById(containerId);
@@ -46,10 +46,11 @@
             zoomAnimation: true
         }).setView([center.lat, center.lng], zoom);
 
-        L.tileLayer(TILE_URL, {
+        const tileLayer = L.tileLayer(TILE_URL, {
             attribution: TILE_ATTRIBUTION,
             maxZoom: 19
         }).addTo(map);
+tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightness(95%) contrast(90%)';
 
         maps[containerId] = map;
         markers[containerId] = [];

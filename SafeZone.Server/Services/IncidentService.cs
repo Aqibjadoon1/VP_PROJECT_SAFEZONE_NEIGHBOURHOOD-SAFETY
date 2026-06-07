@@ -8,10 +8,17 @@ namespace SafeZone.Server.Services;
 public class IncidentService : IIncidentService
 {
     private readonly SafeZoneDbContext _context;
+    private readonly IGmailNotificationService? _gmail;
+    private readonly ISlackNotificationService? _slack;
 
-    public IncidentService(SafeZoneDbContext context)
+    public IncidentService(
+        SafeZoneDbContext context,
+        IGmailNotificationService? gmail = null,
+        ISlackNotificationService? slack = null)
     {
         _context = context;
+        _gmail = gmail;
+        _slack = slack;
     }
 
     public async Task<IncidentResponseDto> CreateIncidentAsync(CreateIncidentDto dto, Guid? reporterId)
@@ -45,6 +52,23 @@ public class IncidentService : IIncidentService
 
         _context.Incidents.Add(incident);
         await _context.SaveChangesAsync();
+
+        if (reporterId.HasValue && _gmail != null)
+        {
+            var reporter = await _context.Users.FindAsync(reporterId.Value);
+            if (reporter?.PhoneNumber != null)
+            {
+                _ = _gmail.SendIncidentAlertAsync(reporter.PhoneNumber, dto.Title, dto.Severity.ToString());
+            }
+        }
+
+        if (_slack != null && (dto.Severity == SeverityLevel.Critical || dto.Severity == SeverityLevel.High))
+        {
+            _ = _slack.SendAlertAsync(
+                dto.Title,
+                $"New {dto.Severity} severity incident at {dto.Address}: {dto.Description}",
+                dto.Severity.ToString());
+        }
 
         return MapToResponse(incident, category);
     }
