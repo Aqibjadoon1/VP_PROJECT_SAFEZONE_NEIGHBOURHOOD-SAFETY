@@ -31,7 +31,7 @@ window.initHeroEffects = function () {
 
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
-    camera.position.set(0, 1, 6);
+    camera.position.set(0, 0.65, 5.8);
     camera.lookAt(0, 0, 0);
 
     var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -41,82 +41,75 @@ window.initHeroEffects = function () {
     renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0x88ffee, 0.55));
+    scene.add(new THREE.AmbientLight(0x8cffc3, 0.62));
     var keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
     keyLight.position.set(2.6, 4.6, 4.2);
     scene.add(keyLight);
-    var cyanLight = new THREE.PointLight(0x00d4ff, 3.2, 8);
-    cyanLight.position.set(-2.8, 1.8, 3.4);
-    scene.add(cyanLight);
-    var greenLight = new THREE.PointLight(0x00ff88, 2.7, 7);
-    greenLight.position.set(2.4, -1.1, 2.6);
+    var greenLight = new THREE.PointLight(0x00ff88, 4.1, 8);
+    greenLight.position.set(-2.7, 1.8, 3.2);
     scene.add(greenLight);
-    var violetLight = new THREE.PointLight(0x8b5cf6, 1.8, 7);
-    violetLight.position.set(0, 2.5, -3.4);
-    scene.add(violetLight);
+    var rimLight = new THREE.PointLight(0x4dff98, 2.6, 7);
+    rimLight.position.set(2.4, -1.2, 2.8);
+    scene.add(rimLight);
+    var backLight = new THREE.PointLight(0x0bbf6a, 1.7, 7);
+    backLight.position.set(0, 2.4, -3.4);
+    scene.add(backLight);
 
-    // === Holographic DNA helix sculpture ===
+    // === Transparent green DNA orb ===
     var helixGroup = new THREE.Group();
-    helixGroup.rotation.z = -0.02;
+    helixGroup.rotation.z = -0.04;
     scene.add(helixGroup);
 
-    var helixRadius = 0.86;
-    var helixHeight = 4.05;
-    var turns = 2.65;
-    var segments = 184;
-    var ribbonWidth = 0.28;
+    var helixRadius = 1.18;
+    var helixHeight = 3.65;
+    var turns = 2.05;
+    var segments = 220;
+    var ribbonWidth = 0.18;
 
     var spineMatA = new THREE.MeshPhysicalMaterial({
-        color: 0xeffff8,
-        emissive: 0x00d4ff,
-        emissiveIntensity: 0.42,
-        roughness: 0.12,
-        metalness: 0.52,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.15,
+        color: 0xd9ffe8,
+        emissive: 0x00ff88,
+        emissiveIntensity: 0.5,
+        roughness: 0.08,
+        metalness: 0.28,
+        clearcoat: 1,
+        clearcoatRoughness: 0.08,
+        transmission: 0.34,
         transparent: true,
-        opacity: 0.96
+        opacity: 0.72
     });
 
     var spineMatB = new THREE.MeshPhysicalMaterial({
-        color: 0x172f37,
+        color: 0x49ff93,
         emissive: 0x00ff88,
-        emissiveIntensity: 0.55,
-        roughness: 0.1,
-        metalness: 0.65,
-        clearcoat: 0.75,
-        clearcoatRoughness: 0.12,
+        emissiveIntensity: 0.48,
+        roughness: 0.08,
+        metalness: 0.2,
+        clearcoat: 1,
+        clearcoatRoughness: 0.08,
+        transmission: 0.28,
         transparent: true,
-        opacity: 0.93
+        opacity: 0.66
     });
 
     var ribbonMat = new THREE.MeshBasicMaterial({
-        color: 0x00d4ff,
+        color: 0x2dff8c,
         transparent: true,
-        opacity: 0.13,
+        opacity: 0.09,
         side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
 
     var rungMat = new THREE.MeshPhysicalMaterial({
-        color: 0xdffff2,
+        color: 0xc9ffdc,
         emissive: 0x00ff88,
-        emissiveIntensity: 0.2,
-        roughness: 0.2,
-        metalness: 0.34,
-        transparent: true,
-        opacity: 0.78
-    });
-
-    var baseMat = new THREE.MeshPhysicalMaterial({
-        color: 0x0e2025,
-        emissive: 0x00d4ff,
-        emissiveIntensity: 0.16,
+        emissiveIntensity: 0.26,
         roughness: 0.16,
-        metalness: 0.72,
+        metalness: 0.18,
+        clearcoat: 0.9,
         transparent: true,
-        opacity: 0.88
+        opacity: 0.56
     });
 
     var pulseMat = new THREE.MeshBasicMaterial({
@@ -128,20 +121,40 @@ window.initHeroEffects = function () {
     });
 
     var orbitMat = new THREE.MeshBasicMaterial({
-        color: 0x00d4ff,
+        color: 0x00ff88,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.18,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
         depthWrite: false
     });
 
+    var shellMat = new THREE.MeshPhysicalMaterial({
+        color: 0x00ff88,
+        emissive: 0x00ff88,
+        emissiveIntensity: 0.08,
+        roughness: 0.05,
+        metalness: 0.04,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        transmission: 0.62,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false
+    });
+
+    function orbProfile(t) {
+        return 0.22 + 0.9 * Math.pow(Math.sin(Math.PI * t), 0.62);
+    }
+
     function helixPoint(t, offset, radius) {
         var a = t * Math.PI * 2 * turns + offset;
+        var shapedRadius = radius * orbProfile(t);
         return new THREE.Vector3(
-            Math.cos(a) * radius,
+            Math.cos(a) * shapedRadius,
             -helixHeight / 2 + t * helixHeight,
-            Math.sin(a) * radius
+            Math.sin(a) * shapedRadius
         );
     }
 
@@ -201,66 +214,56 @@ window.initHeroEffects = function () {
 
     var spineCurveA = createHelixCurve(0, helixRadius);
     var spineCurveB = createHelixCurve(Math.PI, helixRadius);
-    var spineA = new THREE.Mesh(new THREE.TubeGeometry(spineCurveA, segments, 0.075, 18, false), spineMatA);
-    var spineB = new THREE.Mesh(new THREE.TubeGeometry(spineCurveB, segments, 0.075, 18, false), spineMatB);
+    var spineA = new THREE.Mesh(new THREE.TubeGeometry(spineCurveA, segments, 0.068, 22, false), spineMatA);
+    var spineB = new THREE.Mesh(new THREE.TubeGeometry(spineCurveB, segments, 0.068, 22, false), spineMatB);
     helixGroup.add(spineA);
     helixGroup.add(spineB);
 
     var ribbonA = new THREE.Mesh(createRibbonGeometry(0, ribbonWidth), ribbonMat);
     var ribbonB = new THREE.Mesh(createRibbonGeometry(Math.PI, ribbonWidth), ribbonMat.clone());
     ribbonB.material.color.set(0x00ff88);
-    ribbonB.material.opacity = 0.11;
+    ribbonB.material.opacity = 0.08;
     helixGroup.add(ribbonA);
     helixGroup.add(ribbonB);
 
-    for (var r = 0; r < 28; r++) {
-        var rt = 0.035 + r * (0.93 / 27);
+    for (var r = 0; r < 14; r++) {
+        var rt = 0.08 + r * (0.84 / 13);
         var start = helixPoint(rt, 0, helixRadius - 0.12);
         var end = helixPoint(rt, Math.PI, helixRadius - 0.12);
-        var rung = cylinderBetween(start, end, 0.026, rungMat);
+        var rung = cylinderBetween(start, end, 0.021, rungMat);
         helixGroup.add(rung);
     }
 
-    var baseY = -helixHeight / 2 - 0.24;
-    var base = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.36, 0.24, 112), baseMat);
-    base.position.y = baseY;
-    helixGroup.add(base);
+    var shell = new THREE.Mesh(new THREE.SphereGeometry(1.9, 72, 36), shellMat);
+    shell.scale.set(0.96, 1.06, 0.96);
+    helixGroup.add(shell);
 
-    var baseTop = new THREE.Mesh(
-        new THREE.TorusGeometry(1.18, 0.035, 18, 128),
-        new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.42 })
-    );
-    baseTop.rotation.x = Math.PI / 2;
-    baseTop.position.y = baseY + 0.15;
-    helixGroup.add(baseTop);
-
-    var baseGlow = new THREE.Mesh(
-        new THREE.TorusGeometry(0.72, 0.016, 16, 128),
-        new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.38, blending: THREE.AdditiveBlending })
-    );
-    baseGlow.rotation.x = Math.PI / 2;
-    baseGlow.position.y = baseY + 0.19;
-    helixGroup.add(baseGlow);
-
-    var baseRim = new THREE.Mesh(
-        new THREE.TorusGeometry(1.36, 0.045, 18, 128),
-        new THREE.MeshBasicMaterial({ color: 0x02070a, transparent: true, opacity: 0.68 })
-    );
-    baseRim.rotation.x = Math.PI / 2;
-    baseRim.position.y = baseY - 0.13;
-    helixGroup.add(baseRim);
-
-    var orbitRingA = new THREE.Mesh(new THREE.TorusGeometry(1.62, 0.008, 8, 160), orbitMat);
-    orbitRingA.rotation.x = Math.PI / 2.65;
-    orbitRingA.rotation.z = Math.PI / 7;
+    var orbitRingA = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.007, 8, 180), orbitMat);
+    orbitRingA.rotation.x = Math.PI / 2.35;
+    orbitRingA.rotation.z = Math.PI / 8;
     helixGroup.add(orbitRingA);
 
-    var orbitRingB = new THREE.Mesh(new THREE.TorusGeometry(1.88, 0.006, 8, 160), orbitMat.clone());
-    orbitRingB.material.color.set(0x8b5cf6);
-    orbitRingB.material.opacity = 0.16;
-    orbitRingB.rotation.x = -Math.PI / 3.3;
-    orbitRingB.rotation.z = -Math.PI / 5;
+    var orbitRingB = new THREE.Mesh(new THREE.TorusGeometry(1.86, 0.006, 8, 180), orbitMat.clone());
+    orbitRingB.material.opacity = 0.11;
+    orbitRingB.rotation.x = -Math.PI / 2.9;
+    orbitRingB.rotation.z = -Math.PI / 7;
     helixGroup.add(orbitRingB);
+
+    var latitudeRings = [];
+    var latitudes = [-0.64, -0.25, 0.25, 0.64];
+    for (var lr = 0; lr < latitudes.length; lr++) {
+        var y = latitudes[lr] * helixHeight / 2;
+        var ringRadius = Math.sqrt(Math.max(0.2, 1 - latitudes[lr] * latitudes[lr])) * 1.48;
+        var latRing = new THREE.Mesh(
+            new THREE.TorusGeometry(ringRadius, 0.006, 8, 144),
+            orbitMat.clone()
+        );
+        latRing.material.opacity = 0.085;
+        latRing.rotation.x = Math.PI / 2;
+        latRing.position.y = y;
+        helixGroup.add(latRing);
+        latitudeRings.push(latRing);
+    }
 
     var pulseNodes = [];
     for (var pn = 0; pn < 8; pn++) {
@@ -414,17 +417,20 @@ window.initHeroEffects = function () {
         helixGroup.rotation.x = currentRotX + Math.sin(time * 0.5) * 0.02;
         helixGroup.position.y = Math.sin(time * 0.4) * 0.05;
 
-        // Pulse the sculptural materials so the helix feels alive, not decorative.
+        // Pulse the glassy green orb so the helix feels alive, not decorative.
         var pulse = 0.4 + Math.sin(hoverPulse) * 0.15;
         spineMatA.emissiveIntensity = 0.32 + pulse * 0.22;
         spineMatB.emissiveIntensity = 0.38 + pulse * 0.26;
         rungMat.emissiveIntensity = 0.12 + pulse * 0.14;
-        baseMat.emissiveIntensity = 0.08 + pulse * 0.08;
-        ribbonA.material.opacity = 0.11 + pulse * 0.055;
-        ribbonB.material.opacity = 0.09 + pulse * 0.05;
+        shellMat.opacity = 0.095 + pulse * 0.055;
+        ribbonA.material.opacity = 0.065 + pulse * 0.045;
+        ribbonB.material.opacity = 0.06 + pulse * 0.04;
         orbitRingA.rotation.z += 0.0024;
         orbitRingB.rotation.z -= 0.0018;
-        baseGlow.rotation.z += 0.006;
+        shell.rotation.y -= 0.0015;
+        for (var lri = 0; lri < latitudeRings.length; lri++) {
+            latitudeRings[lri].rotation.z += 0.001 + lri * 0.00035;
+        }
 
         for (var pni = 0; pni < pulseNodes.length; pni++) {
             var pNode = pulseNodes[pni];
