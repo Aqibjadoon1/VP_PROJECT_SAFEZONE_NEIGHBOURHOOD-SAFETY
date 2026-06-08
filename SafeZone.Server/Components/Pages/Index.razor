@@ -1,54 +1,93 @@
 @page "/"
 @inject IJSRuntime JS
 
-<div class="hero-section">
-    <div class="hero-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-        <div class="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center" style="min-height: calc(100vh - 160px);">
-            <div class="text-center lg:text-left order-2 lg:order-1">
-                <div class="inline-block mb-6">
-                    <span class="badge badge-primary">
-                        <span class="live-dot"></span> Live Safety Monitoring
-                    </span>
-                </div>
-
-                <h1 class="font-display text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
-                    Your Neighborhood,
-                    <br>
-                    <span class="hero-highlight">Protected.</span>
-                </h1>
-
-                <p class="text-xl mb-8 max-w-xl hero-subtitle">
-                    SafeZone connects residents with emergency services through real-time incident reporting,
-                    AI-powered emergency calls, and live neighborhood mapping.
-                </p>
-
-                <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                    <a href="/register" class="btn btn-primary btn-lg hero-cta">
-                        Join SafeZone &rarr;
-                    </a>
-                    <a href="/login" class="btn btn-outline-primary btn-lg hero-cta">
-                        Sign In
-                    </a>
-                </div>
-
-                <div class="grid grid-cols-3 gap-8 mt-12 pt-8 hero-stats" style="border-top: 1px solid var(--glass-border);">
-                    <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="17">17</p>
-                        <p class="text-muted text-sm mt-2">Incident Types</p>
-                    </div>
-                    <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="24">24/7</p>
-                        <p class="text-muted text-sm mt-2">Support</p>
-                    </div>
-                    <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="4">4</p>
-                        <p class="text-muted text-sm mt-2">User Roles</p>
-                    </div>
-                </div>
+<div class="hero-section hero-command">
+    <div class="hero-content hero-command-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="hero-copy">
+            <div class="hero-monitor-badge">
+                <span class="live-dot"></span>
+                <span>Live Safety<br class="hidden sm:block" /> Monitoring</span>
             </div>
 
-            <div class="order-1 lg:order-2 hero-model-wrap">
-                <div id="hero-canvas" class="hero-canvas"></div>
+            <h1 class="hero-command-title">
+                Your
+                <span>Neighbourhood,</span>
+                <strong>Protected.</strong>
+            </h1>
+
+            <p class="hero-command-subtitle">
+                SafeZone connects residents with emergency services through real-time incident reporting,
+                AI-powered emergency calls, and live neighbourhood mapping.
+            </p>
+
+            <div class="hero-command-actions">
+                <a href="/register" class="hero-command-btn hero-command-btn-primary">
+                    <span>Join SafeZone</span>
+                    <span aria-hidden="true">-&gt;</span>
+                </a>
+                <a href="/login" class="hero-command-btn hero-command-btn-outline">
+                    <span>Sign In</span>
+                </a>
+            </div>
+
+            <div class="hero-command-stats">
+                <div class="hero-stat-item">
+                    <p class="hero-stat-value counter" data-target="17">17</p>
+                    <p>Incident<br />Types</p>
+                </div>
+                <div class="hero-stat-item">
+                    <p class="hero-stat-value counter" data-target="24">24/7</p>
+                    <p>Support</p>
+                </div>
+                <div class="hero-stat-item">
+                    <p class="hero-stat-value counter" data-target="4">4</p>
+                    <p>User Roles</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-radar-wrap" aria-hidden="true">
+            <div class="hero-alert-card hero-alert-fire">
+                <span class="hero-alert-icon hero-alert-icon-fire"></span>
+                <span>
+                    <strong>Fire Alert</strong>
+                    <small>Sector 4 · 2 min ago</small>
+                </span>
+            </div>
+
+            <div class="hero-alert-card hero-alert-zone">
+                <span class="hero-alert-icon hero-alert-icon-zone"></span>
+                <span>
+                    <strong>Zone Secured</strong>
+                    <small>Sector 7 · now</small>
+                </span>
+            </div>
+
+            <div class="hero-alert-card hero-alert-activity">
+                <span class="hero-alert-icon hero-alert-icon-activity"></span>
+                <span>
+                    <strong>Suspicious Activity</strong>
+                    <small>Sector 9 · 5 min ago</small>
+                </span>
+            </div>
+
+            <div class="hero-radar">
+                <div class="hero-radar-sweep"></div>
+                <div class="hero-radar-cross hero-radar-cross-x"></div>
+                <div class="hero-radar-cross hero-radar-cross-y"></div>
+                <div class="hero-radar-core">
+                    <span class="hero-radar-shield"></span>
+                </div>
+                <span class="hero-radar-blip blip-red"></span>
+                <span class="hero-radar-blip blip-amber"></span>
+                <span class="hero-radar-blip blip-cyan"></span>
+                <span class="hero-radar-blip blip-purple"></span>
+                <span class="hero-radar-node node-1"></span>
+                <span class="hero-radar-node node-2"></span>
+                <span class="hero-radar-node node-3"></span>
+                <span class="hero-radar-node node-4"></span>
+                <span class="hero-radar-node node-5"></span>
+                <span class="hero-radar-node node-6"></span>
             </div>
         </div>
     </div>
@@ -233,7 +272,6 @@
     {
         if (firstRender)
         {
-            try { await JS.InvokeVoidAsync("initHeroEffects"); } catch { }
             try { await JS.InvokeVoidAsync("initLandingCounters"); } catch { }
         }
     }
