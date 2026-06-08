@@ -1,4 +1,4 @@
-// Three.js liquid hologram orb - SafeZone brand
+// Three.js green hologram core - SafeZone brand
 window.initHeroEffects = function () {
     var container = document.getElementById('hero-canvas');
     if (!container) return;
@@ -30,364 +30,307 @@ window.initHeroEffects = function () {
     window.__safezoneHeroRetryCount = 0;
 
     var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
-    camera.position.set(0, 0.65, 5.8);
+    scene.fog = new THREE.FogExp2(0x04120c, 0.055);
+
+    var camera = new THREE.PerspectiveCamera(54, w / h, 0.1, 100);
+    camera.position.set(0, 0.45, 5.4);
     camera.lookAt(0, 0, 0);
 
     var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.25;
     container.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0x9af7ff, 0.58));
-    var keyLight = new THREE.DirectionalLight(0xffffff, 1.42);
-    keyLight.position.set(2.6, 4.6, 4.2);
+    scene.add(new THREE.AmbientLight(0x123626, 1.45));
+
+    var keyLight = new THREE.DirectionalLight(0xaaffd4, 0.9);
+    keyLight.position.set(2.6, 4.4, 4.2);
     scene.add(keyLight);
-    var greenLight = new THREE.PointLight(0x2dffc0, 3.8, 8);
-    greenLight.position.set(-2.7, 1.8, 3.2);
+
+    var greenLight = new THREE.PointLight(0x00ff88, 4.8, 8);
+    greenLight.position.set(-2.4, 1.6, 3.1);
     scene.add(greenLight);
-    var rimLight = new THREE.PointLight(0x50e8ff, 2.7, 7);
-    rimLight.position.set(2.4, -1.2, 2.8);
+
+    var rimLight = new THREE.PointLight(0x63ffd1, 2.1, 7);
+    rimLight.position.set(2.3, -1.1, 2.7);
     scene.add(rimLight);
-    var backLight = new THREE.PointLight(0x7d61ff, 2.0, 7);
-    backLight.position.set(0, 2.4, -3.4);
+
+    var backLight = new THREE.PointLight(0x0bbf6a, 2.0, 7);
+    backLight.position.set(0, 2.3, -3.2);
     scene.add(backLight);
 
-    // === Blue-violet liquid hologram orb ===
-    var orbGroup = new THREE.Group();
-    orbGroup.rotation.z = -0.05;
-    scene.add(orbGroup);
+    var hologram = new THREE.Group();
+    hologram.rotation.z = -0.06;
+    scene.add(hologram);
 
-    var orbRadius = 1.62;
-
-    var shellMat = new THREE.MeshPhysicalMaterial({
-        color: 0x182fff,
-        emissive: 0x1f77ff,
-        emissiveIntensity: 0.18,
-        roughness: 0.025,
-        metalness: 0.02,
-        clearcoat: 1,
-        clearcoatRoughness: 0.025,
-        transmission: 0.82,
+    var knotGeo = new THREE.TorusKnotGeometry(1.05, 0.31, 220, 28, 2, 3);
+    var knotMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff88,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    var knot = new THREE.Mesh(knotGeo, knotMat);
+    hologram.add(knot);
+
+    var wireMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff88,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.16,
+        depthWrite: false
+    });
+    var wire = new THREE.Mesh(knotGeo, wireMat);
+    hologram.add(wire);
+
+    var shellGeo = new THREE.TorusKnotGeometry(1.1, 0.35, 220, 28, 2, 3);
+    var shellMat = new THREE.MeshBasicMaterial({
+        color: 0x18ff95,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.055,
+        depthWrite: false
+    });
+    var shell = new THREE.Mesh(shellGeo, shellMat);
+    hologram.add(shell);
+
+    var glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0x0aff8d,
+        emissive: 0x00bf68,
+        emissiveIntensity: 0.12,
+        roughness: 0.04,
+        metalness: 0.03,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        transmission: 0.74,
+        transparent: true,
+        opacity: 0.08,
         side: THREE.DoubleSide,
         depthWrite: false
     });
+    var glassOrb = new THREE.Mesh(new THREE.SphereGeometry(1.58, 96, 48), glassMat);
+    hologram.add(glassOrb);
 
-    var shell = new THREE.Mesh(new THREE.SphereGeometry(orbRadius, 112, 56), shellMat);
-    orbGroup.add(shell);
-
-    var rimShellMat = new THREE.MeshBasicMaterial({
-        color: 0x6b4dff,
-        transparent: true,
-        opacity: 0.16,
-        blending: THREE.AdditiveBlending,
-        side: THREE.BackSide,
-        depthWrite: false
-    });
-    var rimShell = new THREE.Mesh(new THREE.SphereGeometry(orbRadius * 1.03, 96, 48), rimShellMat);
-    orbGroup.add(rimShell);
+    function makeGlowTexture() {
+        var c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        var ctx = c.getContext('2d');
+        var g = ctx.createRadialGradient(128, 128, 2, 128, 128, 128);
+        g.addColorStop(0, 'rgba(0,255,136,0.32)');
+        g.addColorStop(0.25, 'rgba(45,255,192,0.18)');
+        g.addColorStop(0.58, 'rgba(0,255,136,0.07)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        return new THREE.CanvasTexture(c);
+    }
 
     var innerGlowMat = new THREE.SpriteMaterial({
-        map: (function () {
-            var c = document.createElement('canvas');
-            c.width = 256; c.height = 256;
-            var ctx = c.getContext('2d');
-            var g = ctx.createRadialGradient(128, 128, 4, 128, 128, 128);
-            g.addColorStop(0, 'rgba(120,78,255,0.52)');
-            g.addColorStop(0.28, 'rgba(42,119,255,0.28)');
-            g.addColorStop(0.58, 'rgba(0,255,156,0.1)');
-            g.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, 256, 256);
-            return new THREE.CanvasTexture(c);
-        })(),
+        map: makeGlowTexture(),
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        opacity: 0.78
+        opacity: 0.7
     });
     var innerGlow = new THREE.Sprite(innerGlowMat);
-    innerGlow.scale.set(3.4, 3.4, 1);
-    orbGroup.add(innerGlow);
+    innerGlow.scale.set(3.5, 3.5, 1);
+    hologram.add(innerGlow);
 
-    function createSurfaceSwirlCurve(phase, twist, yScale, radius, frequency) {
-        var pts = [];
-        for (var i = 0; i <= 170; i++) {
-            var t = i / 170;
-            var latitude = Math.sin(t * Math.PI * 2 * frequency + phase) * yScale +
-                Math.sin(t * Math.PI * 7 + phase * 0.45) * 0.12;
-            latitude = Math.max(-0.88, Math.min(0.88, latitude));
-            var ring = Math.sqrt(Math.max(0.04, 1 - latitude * latitude));
-            var a = t * Math.PI * 2 * twist + phase +
-                Math.sin(t * Math.PI * 5 + phase) * 0.62;
-            var wobble = 1 + Math.sin(t * Math.PI * 10 + phase) * 0.035;
-            pts.push(new THREE.Vector3(
-                Math.cos(a) * radius * ring * wobble,
-                latitude * radius,
-                Math.sin(a) * radius * ring * wobble
-            ));
-        }
-        return new THREE.CatmullRomCurve3(pts);
+    var haloMat = new THREE.SpriteMaterial({
+        map: makeGlowTexture(),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        opacity: 0.52
+    });
+    var halo = new THREE.Sprite(haloMat);
+    halo.scale.set(5.6, 5.6, 1);
+    halo.position.z = -0.45;
+    scene.add(halo);
+
+    var pCount = 1200;
+    var pGeo = new THREE.BufferGeometry();
+    var positions = new Float32Array(pCount * 3);
+    var speeds = new Float32Array(pCount);
+    var radii = new Float32Array(pCount);
+    var angles = new Float32Array(pCount);
+
+    for (var pi = 0; pi < pCount; pi++) {
+        var radius = 1.55 + Math.random() * 1.75;
+        var theta = Math.random() * Math.PI * 2;
+        var phi = Math.acos(2 * Math.random() - 1);
+        radii[pi] = radius;
+        angles[pi] = theta;
+        speeds[pi] = 0.05 + Math.random() * 0.18;
+        positions[pi * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[pi * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[pi * 3 + 2] = radius * Math.cos(phi);
     }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-    function createSwirlMaterial(color, opacity) {
-        return new THREE.MeshBasicMaterial({
+    var pMat = new THREE.PointsMaterial({
+        color: 0x00ff88,
+        size: 0.019,
+        transparent: true,
+        opacity: 0.42,
+        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    var particles = new THREE.Points(pGeo, pMat);
+    hologram.add(particles);
+
+    function makeRing(radius, tilt, color, opacity) {
+        var geo = new THREE.TorusGeometry(radius, 0.006, 8, 160);
+        var mat = new THREE.MeshBasicMaterial({
             color: color,
             transparent: true,
             opacity: opacity,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
+        var mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = tilt;
+        hologram.add(mesh);
+        return mesh;
     }
 
-    var surfaceSwirls = [];
-    var swirlColors = [0x22dfff, 0x2f66ff, 0x704dff, 0x9a4dff, 0x00ff9f, 0x32c8ff, 0x345bff, 0x7d58ff, 0x27ffc8, 0x5a82ff, 0xc64dff, 0x5e4dff];
-    for (var sw = 0; sw < 15; sw++) {
-        var phase = sw * 0.53;
-        var twist = 0.85 + (sw % 5) * 0.28;
-        var yScale = 0.44 + (sw % 4) * 0.09;
-        var tubeRadius = sw % 5 === 0 ? 0.031 : 0.017 + (sw % 3) * 0.003;
-        var frequency = 1 + (sw % 3) * 0.45;
-        var swirlMesh = new THREE.Mesh(
-            new THREE.TubeGeometry(createSurfaceSwirlCurve(phase, twist, yScale, orbRadius * (0.96 + (sw % 3) * 0.012), frequency), 170, tubeRadius, 12, false),
-            createSwirlMaterial(swirlColors[sw % swirlColors.length], sw % 5 === 0 ? 0.56 : 0.36)
-        );
-        swirlMesh.rotation.x = (sw % 5 - 2) * 0.22;
-        swirlMesh.rotation.y = phase * 0.27;
-        swirlMesh.rotation.z = (sw % 2 === 0 ? 1 : -1) * (0.16 + sw * 0.008);
-        orbGroup.add(swirlMesh);
-        surfaceSwirls.push({
-            mesh: swirlMesh,
-            material: swirlMesh.material,
-            phase: phase,
-            baseOpacity: sw % 5 === 0 ? 0.45 : 0.25,
-            speed: (sw % 2 === 0 ? 1 : -1) * (0.001 + sw * 0.00007)
+    var ring1 = makeRing(1.85, Math.PI / 2, 0x00ff88, 0.34);
+    var ring2 = makeRing(2.16, Math.PI / 3.1, 0x63ffd1, 0.2);
+    var ring3 = makeRing(2.48, -Math.PI / 5.2, 0x0bbf6a, 0.14);
+
+    function makeGridDisc() {
+        var geo = new THREE.BufferGeometry();
+        var verts = [];
+        var spokes = 32;
+        var rings = 5;
+        var outerRadius = 2.55;
+
+        for (var ri = 1; ri <= rings; ri++) {
+            var rad = (ri / rings) * outerRadius;
+            var seg = 96;
+            for (var si = 0; si < seg; si++) {
+                var a0 = (si / seg) * Math.PI * 2;
+                var a1 = ((si + 1) / seg) * Math.PI * 2;
+                verts.push(rad * Math.cos(a0), 0, rad * Math.sin(a0));
+                verts.push(rad * Math.cos(a1), 0, rad * Math.sin(a1));
+            }
+        }
+
+        for (var sp = 0; sp < spokes; sp++) {
+            var a = (sp / spokes) * Math.PI * 2;
+            verts.push(0, 0, 0);
+            verts.push(outerRadius * Math.cos(a), 0, outerRadius * Math.sin(a));
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        var mat = new THREE.LineBasicMaterial({
+            color: 0x00ff88,
+            transparent: true,
+            opacity: 0.1,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
         });
+        return new THREE.LineSegments(geo, mat);
     }
 
-    var sparkleMat = new THREE.MeshBasicMaterial({
-        color: 0x53fff0,
-        transparent: true,
-        opacity: 0.48,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-    });
-    var orbSparkles = [];
-    for (var gl = 0; gl < 34; gl++) {
-        var theta = Math.random() * Math.PI * 2;
-        var u = Math.random() * 2 - 1;
-        var ring = Math.sqrt(1 - u * u);
-        var sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.01 + Math.random() * 0.014, 8, 8), sparkleMat.clone());
-        sparkle.position.set(
-            Math.cos(theta) * ring * orbRadius * 1.01,
-            u * orbRadius * 1.01,
-            Math.sin(theta) * ring * orbRadius * 1.01
-        );
-        orbGroup.add(sparkle);
-        orbSparkles.push({
-            mesh: sparkle,
-            phase: Math.random() * Math.PI * 2,
-            baseOpacity: 0.25 + Math.random() * 0.45
-        });
-    }
+    var disc = makeGridDisc();
+    disc.rotation.x = Math.PI / 2;
+    disc.position.y = -0.08;
+    hologram.add(disc);
 
-    // === Glow halo behind hologram ===
-    var haloMat = new THREE.SpriteMaterial({
-        map: (function () {
-            var c = document.createElement('canvas');
-            c.width = 256; c.height = 256;
-            var ctx = c.getContext('2d');
-            var g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-            g.addColorStop(0, 'rgba(126,96,255,0.2)');
-            g.addColorStop(0.22, 'rgba(45,255,192,0.12)');
-            g.addColorStop(0.52, 'rgba(45,168,255,0.05)');
-            g.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, 256, 256);
-            return new THREE.CanvasTexture(c);
-        })(),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-    });
-    var halo = new THREE.Sprite(haloMat);
-    halo.scale.set(5.5, 5.5, 1);
-    halo.position.z = -0.3;
-    scene.add(halo);
-
-    // === Orbiting Particles ===
-    var pCount = 250;
-    var pGeo = new THREE.BufferGeometry();
-    var pPos = new Float32Array(pCount * 3);
-    var pSpeeds = new Float32Array(pCount);
-    var pRadii = new Float32Array(pCount);
-    var pYOffset = new Float32Array(pCount);
-
-    for (var i = 0; i < pCount; i++) {
-        var r = 2.4 + Math.random() * 1.8;
-        var a = Math.random() * Math.PI * 2;
-        pRadii[i] = r;
-        pSpeeds[i] = 0.08 + Math.random() * 0.2;
-        pYOffset[i] = (Math.random() - 0.5) * 4.5;
-        pPos[i * 3] = Math.cos(a) * r;
-        pPos[i * 3 + 1] = pYOffset[i];
-        pPos[i * 3 + 2] = Math.sin(a) * r;
-    }
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-
-    var pMat = new THREE.PointsMaterial({
-        color: 0x45f7ff,
-        size: 0.025,
-        transparent: true,
-        opacity: 0.5,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-    });
-    var particles = new THREE.Points(pGeo, pMat);
-    scene.add(particles);
-
-    // === Floating code/matrix symbols ===
-    var symbolGroup = new THREE.Group();
-    scene.add(symbolGroup);
-    var symbols = '0123456789SOSALERTSAFEZONE';
-    var symbolMat = new THREE.SpriteMaterial({
-        map: (function () {
-            var c = document.createElement('canvas');
-            c.width = 64; c.height = 64;
-            var ctx = c.getContext('2d');
-            ctx.font = 'bold 32px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = 'rgba(92,226,255,0.12)';
-            ctx.fillText('01', 32, 32);
-            return new THREE.CanvasTexture(c);
-        })(),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-    });
-
-    var symSprites = [];
-    for (var i = 0; i < 15; i++) {
-        var sMat = symbolMat.clone();
-        var sprite = new THREE.Sprite(sMat);
-        var radius = 2.2 + Math.random() * 2.0;
-        var theta = Math.random() * Math.PI * 2;
-        sprite.position.set(
-            Math.cos(theta) * radius,
-            (Math.random() - 0.5) * 4,
-            Math.sin(theta) * radius
-        );
-        sprite.scale.set(0.15 + Math.random() * 0.2, 0.15 + Math.random() * 0.2, 1);
-        sprite.material.opacity = 0.04 + Math.random() * 0.08;
-        symbolGroup.add(sprite);
-        symSprites.push({
-            sprite: sprite,
-            theta: theta,
-            radius: radius,
-            speed: 0.002 + Math.random() * 0.005,
-            ySpeed: 0.001 + Math.random() * 0.003
-        });
-    }
-
-    // === Mouse tracking ===
-    var mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
+    var mouseX = 0;
+    var mouseY = 0;
+    var targetX = 0;
+    var targetY = 0;
     var mouseHandler = function (e) {
         mouseX = (e.clientX / window.innerWidth) * 2 - 1;
         mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
     };
     document.addEventListener('mousemove', mouseHandler);
 
-    // Particle animation data
-    var pp = particles.geometry.attributes.position.array;
-    var pAngles = new Float32Array(pCount);
-    for (var i = 0; i < pCount; i++) {
-        pAngles[i] = Math.atan2(pp[i * 3 + 2], pp[i * 3]);
-    }
-
-    // === Animation ===
     var time = 0;
-    var targetRotY = 0, targetRotX = 0;
-    var currentRotY = 0, currentRotX = 0;
-    var hoverPulse = 0;
     var disposed = false;
     var animationFrame = 0;
+    var pp = particles.geometry.attributes.position.array;
 
     function animate() {
         if (disposed) return;
         animationFrame = requestAnimationFrame(animate);
         time += 0.01;
-        hoverPulse += 0.02;
 
-        targetX += (mouseX - targetX) * 0.02;
-        targetY += (mouseY - targetY) * 0.02;
+        targetX += (mouseX - targetX) * 0.025;
+        targetY += (mouseY - targetY) * 0.025;
 
-        targetRotY += 0.006;
-        targetRotX = Math.sin(time * 0.3) * 0.05;
-        currentRotY += (targetRotY - currentRotY) * 0.04;
-        currentRotX += (targetRotX - currentRotX) * 0.04;
+        hologram.rotation.y += 0.0048;
+        hologram.rotation.x = Math.sin(time * 0.28) * 0.07;
+        hologram.position.y = Math.sin(time * 0.45) * 0.06;
 
-        // Gentle floating on the hologram orb.
-        orbGroup.rotation.y = currentRotY;
-        orbGroup.rotation.x = currentRotX + Math.sin(time * 0.5) * 0.02;
-        orbGroup.position.y = Math.sin(time * 0.4) * 0.05;
+        knot.rotation.x = time * 0.22;
+        knot.rotation.y = time * 0.31;
+        wire.rotation.copy(knot.rotation);
+        shell.rotation.x = time * 0.18;
+        shell.rotation.y = -time * 0.25;
+        glassOrb.rotation.y = -time * 0.06;
 
-        // Pulse the glass shell and liquid swirls so it reads like a live hologram.
-        var pulse = 0.4 + Math.sin(hoverPulse) * 0.15;
-        shellMat.opacity = 0.17 + pulse * 0.055;
-        rimShellMat.opacity = 0.13 + pulse * 0.055;
-        innerGlowMat.opacity = 0.62 + pulse * 0.14;
-        shell.rotation.y -= 0.0018;
-        shell.rotation.x = Math.sin(time * 0.34) * 0.035;
-        rimShell.rotation.y += 0.0011;
-        rimShell.rotation.x = -Math.sin(time * 0.28) * 0.025;
-        for (var swi = 0; swi < surfaceSwirls.length; swi++) {
-            var swirl = surfaceSwirls[swi];
-            swirl.mesh.rotation.y += swirl.speed;
-            swirl.mesh.rotation.x += Math.sin(time * 0.18 + swirl.phase) * 0.0006;
-            swirl.material.opacity = swirl.baseOpacity + pulse * 0.09 +
-                Math.sin(time * 1.2 + swirl.phase) * 0.025;
-        }
-        for (var gli = 0; gli < orbSparkles.length; gli++) {
-            var sparkle = orbSparkles[gli];
-            var sparklePulse = 0.65 + Math.sin(time * 2.1 + sparkle.phase) * 0.35;
-            sparkle.mesh.scale.setScalar(0.75 + sparklePulse * 0.75);
-            sparkle.mesh.material.opacity = sparkle.baseOpacity * sparklePulse;
-        }
+        var breathe = 0.5 + 0.5 * Math.sin(time * 1.35);
+        knotMat.opacity = 0.055 + breathe * 0.055;
+        wireMat.opacity = 0.11 + breathe * 0.08;
+        shellMat.opacity = 0.035 + breathe * 0.055;
+        glassMat.opacity = 0.06 + breathe * 0.035;
+        innerGlowMat.opacity = 0.48 + breathe * 0.18;
+        pMat.opacity = 0.28 + breathe * 0.18;
 
-        // Orbiting particles
+        ring1.rotation.z = time * 0.2;
+        ring2.rotation.z = -time * 0.15;
+        ring2.rotation.y = time * 0.08;
+        ring3.rotation.x = -Math.PI / 5.2 + time * 0.1;
+        ring3.rotation.z = time * 0.12;
+        disc.rotation.z = time * 0.08;
+
         for (var i = 0; i < pCount; i++) {
-            pAngles[i] += pSpeeds[i] * 0.01;
-            var r = pRadii[i];
-            pp[i * 3] = Math.cos(pAngles[i]) * r;
-            pp[i * 3 + 2] = Math.sin(pAngles[i]) * r;
-            pp[i * 3 + 1] += Math.sin(time * 1.5 + i * 0.3) * 0.0008;
+            angles[i] += speeds[i] * 0.002;
+            var verticalPulse = Math.sin(time * 1.2 + i * 0.04) * 0.0025;
+            pp[i * 3] += Math.cos(angles[i]) * 0.0009;
+            pp[i * 3 + 1] += verticalPulse;
+            pp[i * 3 + 2] += Math.sin(angles[i]) * 0.0009;
+            var distance = Math.sqrt(
+                pp[i * 3] * pp[i * 3] +
+                pp[i * 3 + 1] * pp[i * 3 + 1] +
+                pp[i * 3 + 2] * pp[i * 3 + 2]
+            );
+            if (distance > radii[i] + 0.08 || distance < radii[i] - 0.08) {
+                var scale = radii[i] / Math.max(distance, 0.0001);
+                pp[i * 3] *= scale;
+                pp[i * 3 + 1] *= scale;
+                pp[i * 3 + 2] *= scale;
+            }
         }
         particles.geometry.attributes.position.needsUpdate = true;
 
-        // Floating symbols rotate slowly
-        symbolGroup.rotation.y += 0.001;
-        symbolGroup.rotation.x = Math.sin(time * 0.2) * 0.03;
+        greenLight.position.x = 2.6 * Math.cos(time * 0.5);
+        greenLight.position.z = 2.6 * Math.sin(time * 0.5);
+        rimLight.position.x = -2.4 * Math.sin(time * 0.42);
+        rimLight.position.z = 2.4 * Math.cos(time * 0.42);
 
-        // Camera follow mouse with parallax
-        var ca = targetX * 0.3;
-        var ch = 1 + targetY * 0.25;
-        var cx = Math.sin(ca) * 6;
-        var cz = Math.cos(ca) * 6;
+        var ca = targetX * 0.28;
+        var ch = 0.65 + targetY * 0.22;
+        var cx = Math.sin(ca) * 5.4;
+        var cz = Math.cos(ca) * 5.4;
         camera.position.x += (cx - camera.position.x) * 0.03;
         camera.position.y += (ch - camera.position.y) * 0.03;
         camera.position.z += (cz - camera.position.z) * 0.03;
-        camera.lookAt(0, Math.sin(time * 0.3) * 0.05, 0);
+        camera.lookAt(0, Math.sin(time * 0.3) * 0.04, 0);
 
         renderer.render(scene, camera);
     }
     animate();
 
-    // Resize handler
     var resizeHandler = function () {
         var nw = container.clientWidth;
         var nh = container.clientHeight;
