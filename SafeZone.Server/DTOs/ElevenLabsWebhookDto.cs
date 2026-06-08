@@ -4,6 +4,27 @@ namespace SafeZone.Server.DTOs;
 
 public class ElevenLabsWebhookPayload
 {
+    [JsonPropertyName("category")]
+    public string? Category { get; init; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("address")]
+    public string? Address { get; init; }
+
+    [JsonPropertyName("severity")]
+    public string? Severity { get; init; }
+
+    [JsonPropertyName("is_anonymous")]
+    public bool? IsAnonymous { get; init; }
+
+    [JsonPropertyName("latitude")]
+    public double? Latitude { get; init; }
+
+    [JsonPropertyName("longitude")]
+    public double? Longitude { get; init; }
+
     [JsonPropertyName("agent_id")]
     public string AgentId { get; init; } = string.Empty;
 

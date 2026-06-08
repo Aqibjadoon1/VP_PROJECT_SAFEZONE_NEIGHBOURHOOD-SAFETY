@@ -49,7 +49,7 @@ All services in this file are **opt-in**. Leave them empty and the app runs in f
 ```json
 "Gmail": {
   "ClientId": "your-client-id.apps.googleusercontent.com",
-  "ClientSecret": "GOCSPX-xxxxxxxxxxxxxxxxxxxx",
+  "ClientSecret": "GOOGLE_OAUTH_CLIENT_SECRET",
   "RefreshToken": "1//xxxxxxxxxxxxxxxxxxxx",
   "FromEmail": "youraccount@gmail.com",
   "ApplicationName": "SafeZone"
@@ -87,7 +87,7 @@ All services in this file are **opt-in**. Leave them empty and the app runs in f
 
 ```json
 "Slack": {
-  "WebhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/xxxxxxxxxxxxxxxx"
+  "WebhookUrl": "SLACK_INCOMING_WEBHOOK_URL"
 }
 ```
 
@@ -199,7 +199,7 @@ curl -X POST https://localhost:7026/api/elevenlabswebhook `
 "Authentication": {
   "Google": {
     "ClientId": "your-client-id.apps.googleusercontent.com",
-    "ClientSecret": "GOCSPX-xxxxxxxxxxxxxxxxxxxx"
+    "ClientSecret": "GOOGLE_OAUTH_CLIENT_SECRET"
   }
 }
 ```
@@ -221,7 +221,7 @@ Never commit real API keys to git. Use User Secrets:
 cd SafeZone.Server
 dotnet user-secrets set "Smtp:Password" "your-real-password"
 dotnet user-secrets set "Groq:ApiKey" "gsk_real_key"
-dotnet user-secrets set "Slack:WebhookUrl" "https://hooks.slack.com/services/..."
+dotnet user-secrets set "Slack:WebhookUrl" "SLACK_INCOMING_WEBHOOK_URL"
 dotnet user-secrets set "Jwt:Key" "your-real-32-char-secret"
 ```
 

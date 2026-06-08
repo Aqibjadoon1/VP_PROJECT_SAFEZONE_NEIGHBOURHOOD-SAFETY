@@ -12,7 +12,7 @@ public static class RetryHelper
         {
             try { return await operation(cancellationToken); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) when (attempt < maxAttempts)
+            catch (Exception) when (attempt < maxAttempts)
             {
                 var delay = baseDelayMs * Math.Pow(2, attempt - 1);
                 var jitter = Random.Shared.NextDouble() * delay * 0.3;

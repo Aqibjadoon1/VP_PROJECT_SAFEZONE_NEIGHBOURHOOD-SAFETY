@@ -1,0 +1,45 @@
+services:
+  safezone:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__SqliteConnection: Data Source=/data/SafeZone.db
+      Jwt__Key: ${JWT_KEY}
+      ElevenLabs__AgentId: agent_7201ktkdw5kteq3abwcn9hjwe0c9
+      ElevenLabs__AllowUnsignedServerTools: "true"
+      Gmail__ClientId: ${GMAIL_CLIENT_ID:-}
+      Gmail__ClientSecret: ${GMAIL_CLIENT_SECRET:-}
+      Gmail__RefreshToken: ${GMAIL_REFRESH_TOKEN:-}
+      Gmail__FromEmail: ${GMAIL_FROM_EMAIL:-}
+      Slack__WebhookUrl: ${SLACK_WEBHOOK_URL:-}
+    volumes:
+      - safezone-data:/data
+    networks:
+      - safezone
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - safezone
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - safezone
+
+networks:
+  safezone:
+
+volumes:
+  safezone-data:
+  caddy-data:
+  caddy-config:

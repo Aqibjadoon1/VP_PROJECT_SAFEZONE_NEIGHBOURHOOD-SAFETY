@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SafeZone.Server.DTOs;
 using SafeZone.Server.Services;
@@ -15,23 +16,39 @@ public class PasswordResetController : ControllerBase
         _authService = authService;
     }
 
+    [AllowAnonymous]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { success = false, message = "Invalid request." });
+        }
+
+        // Always return the same response to prevent user enumeration
+        string responseMessage = "If the phone number exists, a reset token has been sent.";
+
         try
         {
-            var token = await _authService.GeneratePasswordResetTokenAsync(dto.PhoneNumber);
-            return Ok(new { success = true, message = "Password reset token generated.", token });
+            _ = await _authService.GeneratePasswordResetTokenAsync(dto.PhoneNumber);
         }
         catch (KeyNotFoundException)
         {
-            return Ok(new { success = true, message = "If the phone number exists, a reset token has been generated." });
+            // User does not exist — do not reveal this
         }
+
+        return Ok(new { success = true, message = responseMessage });
     }
 
+    [AllowAnonymous]
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { success = false, message = "Invalid request." });
+        }
+
         var result = await _authService.ResetPasswordAsync(dto.PhoneNumber, dto.Token, dto.NewPassword);
 
         if (!result.Success)

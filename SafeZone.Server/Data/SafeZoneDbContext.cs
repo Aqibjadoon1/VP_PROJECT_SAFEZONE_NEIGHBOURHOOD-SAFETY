@@ -175,7 +175,7 @@ public class SafeZoneDbContext : IdentityDbContext<User, IdentityRole<Guid>, Gui
         builder.Entity<AICallLog>(b =>
         {
             b.HasKey(c => c.LogId);
-            b.HasIndex(c => c.TwilioCallSid).IsUnique().HasFilter("[TwilioCallSid] IS NOT NULL");
+            b.HasIndex(c => c.TwilioCallSid).IsUnique();
             b.HasIndex(c => c.Status);
             b.HasIndex(c => c.InitiatedAt);
             b.HasIndex(c => c.IncidentId);

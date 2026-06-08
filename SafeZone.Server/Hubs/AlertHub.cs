@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Text.Encodings.Web;
 
 namespace SafeZone.Server.Hubs;
 
@@ -8,6 +9,10 @@ public class AlertHub : Hub
 {
     public async Task JoinAuthorityGroup()
     {
+        if (!IsAuthorityOrHigher(Context.User))
+        {
+            return;
+        }
         await Groups.AddToGroupAsync(Context.ConnectionId, "authorities");
     }
 
@@ -30,6 +35,11 @@ public class AlertHub : Hub
 
     public async Task BroadcastAlert(string alertType, string title, string message)
     {
+        if (!IsAuthorityOrHigher(Context.User))
+        {
+            return;
+        }
+
         await Clients.All.SendAsync("ReceiveAlert", new
         {
             AlertType = alertType,
@@ -41,11 +51,22 @@ public class AlertHub : Hub
 
     public async Task SendEmergencyCallRequest(Guid incidentId, string callerInfo)
     {
+        if (Context.User is null)
+        {
+            return;
+        }
+
         await Clients.Group("authorities").SendAsync("EmergencyCallRequested", new
         {
             IncidentId = incidentId,
             CallerInfo = callerInfo,
             Timestamp = DateTime.UtcNow
         });
+    }
+
+    private static bool IsAuthorityOrHigher(System.Security.Claims.ClaimsPrincipal? user)
+    {
+        if (user is null) return false;
+        return user.IsInRole("Authority") || user.IsInRole("Admin") || user.IsInRole("SuperAdmin");
     }
 }

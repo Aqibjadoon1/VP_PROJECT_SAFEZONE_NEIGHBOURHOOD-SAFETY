@@ -26,8 +26,11 @@ public class SosController : ControllerBase
     }
 
     [HttpPost("trigger")]
-    public async Task<ActionResult<SosResponseDto>> TriggerEmergency(TriggerSosDto dto)
+    public async Task<ActionResult<SosResponseDto>> TriggerEmergency([FromBody] TriggerSosDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 
@@ -36,9 +39,13 @@ public class SosController : ControllerBase
             var result = await _sosService.TriggerEmergencyAsync(dto, userId.Value);
             return Ok(result);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to trigger emergency." });
         }
     }
 
@@ -59,6 +66,8 @@ public class SosController : ControllerBase
         CallStatus? statusEnum = null;
         if (status.HasValue)
         {
+            if (!Enum.IsDefined(typeof(CallStatus), status.Value))
+                return BadRequest(new { message = "Invalid status value." });
             statusEnum = (CallStatus)status.Value;
         }
 
@@ -73,9 +82,9 @@ public class SosController : ControllerBase
         if (log == null) return NotFound(new { message = "Call log not found" });
 
         var userId = GetCurrentUserId();
-        var userRole = User.FindFirstValue(ClaimTypes.Role);
+        var isAuthority = User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
 
-        if (userRole != "Authority" && userRole != "SuperAdmin")
+        if (!isAuthority)
         {
             var myLogs = await _sosService.GetMyCallLogsAsync(userId ?? Guid.Empty);
             if (!myLogs.Any(l => l.LogId == id))
@@ -92,6 +101,14 @@ public class SosController : ControllerBase
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
+
+        // Verify ownership in the controller to prevent IDOR
+        var log = await _sosService.GetCallLogByIdAsync(id);
+        if (log == null) return NotFound(new { message = "Call log not found" });
+
+        var isAuthority = User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+        if (!isAuthority && log.UserId != userId.Value)
+            return Forbid();
 
         var result = await _sosService.MarkAsFalseAlarmAsync(id, userId.Value);
         if (result == null) return NotFound(new { message = "Call log not found or not authorized" });

@@ -32,7 +32,8 @@ public static class GeoHelper
         double centerLat, double centerLng, double radiusKm)
     {
         var latChange = radiusKm / 110.574;
-        var lngChange = radiusKm / (111.320 * Math.Cos(DegreesToRadians(centerLat)));
+        var cosLat = Math.Cos(DegreesToRadians(centerLat));
+        var lngChange = cosLat < 1e-10 ? double.MaxValue : radiusKm / (111.320 * cosLat);
 
         return (
             MinLat: centerLat - latChange,

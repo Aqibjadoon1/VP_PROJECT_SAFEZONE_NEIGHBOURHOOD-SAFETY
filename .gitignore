@@ -11,3 +11,7 @@ obj/
 .superpowers/
 node_modules/
 *.cache
+*.log
+.tools/
+publish/
+publish-check/

@@ -6,6 +6,7 @@ public sealed class EnergyVadService : IVoiceActivityDetector
     private readonly float _smoothingAlpha;
     private float _smoothedEnergy;
     private bool _disposed;
+    private readonly object _lock = new();
 
     public float LastSpeechProbability { get; private set; }
 
@@ -23,12 +24,15 @@ public sealed class EnergyVadService : IVoiceActivityDetector
         var rms = CalculateRms(audioData);
         var db = RmsToDecibels(rms);
 
-        _smoothedEnergy = _smoothingAlpha * _smoothedEnergy + (1f - _smoothingAlpha) * db;
+        lock (_lock)
+        {
+            _smoothedEnergy = _smoothingAlpha * _smoothedEnergy + (1f - _smoothingAlpha) * db;
 
-        var normalizedDb = Math.Clamp((_smoothedEnergy + 60f) / 60f, 0f, 1f);
-        LastSpeechProbability = normalizedDb;
+            var normalizedDb = Math.Clamp((_smoothedEnergy + 60f) / 60f, 0f, 1f);
+            LastSpeechProbability = normalizedDb;
 
-        return normalizedDb > _energyThreshold;
+            return normalizedDb > _energyThreshold;
+        }
     }
 
     private static float CalculateRms(byte[] audioData)

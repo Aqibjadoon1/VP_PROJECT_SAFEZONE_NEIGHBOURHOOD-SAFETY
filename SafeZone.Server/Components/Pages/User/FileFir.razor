@@ -1,10 +1,13 @@
 @page "/user/file-fir"
 @layout DashboardLayout
 @attribute [Authorize(Roles = "Resident")]
+@implements IDisposable
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthState
 @inject IFirService FirService
 @inject IIncidentService IncidentService
+@inject IJSRuntime JS
+@inject ToastService ToastSvc
 
 <style>
     .step-indicator {
@@ -339,6 +342,9 @@
     private string FirNumber = "";
     private List<IncidentListDto> MyIncidents = new();
     private Guid UserId;
+    private double? SelectedLat;
+    private double? SelectedLng;
+    private DotNetObjectReference<FileFir>? _dotNetRef;
 
     private bool CanGoStep2 =>
         !string.IsNullOrWhiteSpace(Model.ComplainantName) &&
@@ -398,6 +404,43 @@
         Model.IncidentDateTime = now;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("safezoneMap.init", "fir-map", new { zoomControl = false, scrollWheelZoom = false });
+                _dotNetRef?.Dispose();
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("safezoneMap.enableDotNetLocationPicker", "fir-map", _dotNetRef);
+            }
+            catch { /* ignore for prerendering */ }
+        }
+    }
+
+    [JSInvokable]
+    public void OnLocationSelected(double lat, double lng)
+    {
+        SelectedLat = lat;
+        SelectedLng = lng;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        _dotNetRef = null;
+        try
+        {
+            _ = JS.InvokeVoidAsync("safezoneMap.dispose", "fir-map");
+        }
+        catch
+        {
+            // Circuit may already be gone during navigation
+        }
+    }
+
     private void GoToStep1()
     {
         CurrentStep = 1;
@@ -442,8 +485,8 @@
                 EstimatedLoss = Model.EstimatedLoss,
                 IncidentDateTime = Model.IncidentDateTime!.Value.ToUniversalTime(),
                 IncidentPlace = Model.IncidentPlace.Trim(),
-                IncidentLatitude = 33.6844,
-                IncidentLongitude = 73.0479,
+                IncidentLatitude = SelectedLat ?? 33.6844,
+                IncidentLongitude = SelectedLng ?? 73.0479,
                 NumberOfAccused = Model.NumberOfAccused > 0 ? Model.NumberOfAccused : 1,
                 AccusedKnown = Model.AccusedKnown,
                 AccusedName = Model.AccusedKnown && !string.IsNullOrWhiteSpace(Model.AccusedName) ? Model.AccusedName.Trim() : null,
@@ -458,6 +501,8 @@
         }
         catch (Exception ex)
         {
+            // Log the error and show feedback to the user
+            Console.WriteLine($"FIR submission failed: {ex.Message}");
             Model.DeclarationAccepted = false;
         }
         finally
@@ -468,6 +513,33 @@
 
     private async Task UseMyLocation()
     {
+        try
+        {
+            var pos = await JS.InvokeAsync<GeolocationResult>("safezoneMap.getCurrentPosition");
+            if (pos != null)
+            {
+                SelectedLat = pos.lat;
+                SelectedLng = pos.lng;
+                await JS.InvokeVoidAsync("safezoneMap.panTo", "fir-map", pos.lat, pos.lng, 15);
+                OnLocationSelected(pos.lat, pos.lng);
+                if (pos.fallback) ToastSvc.ShowInfo("Using Islamabad default location — GPS unavailable. Click the map to refine.");
+                else ToastSvc.ShowSuccess("Location detected!");
+            }
+        }
+        catch
+        {
+            SelectedLat = 33.6844;
+            SelectedLng = 73.0479;
+            ToastSvc.ShowInfo("Using Islamabad default location. Click the map to refine.");
+        }
+        StateHasChanged();
+    }
+
+    private class GeolocationResult
+    {
+        public double lat { get; set; }
+        public double lng { get; set; }
+        public bool fallback { get; set; }
     }
 
     private static string FormatDateTime(DateTime? dateTimeValue)

@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 
 namespace SafeZone.Server.Hubs;
 
 [Authorize]
 public class MapHub : Hub
 {
-    private static readonly Dictionary<string, (double Lat, double Lng)> _userLocations = new();
+    private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> _userLocations = new();
 
     public async Task UpdateLocation(double lat, double lng)
     {
@@ -26,6 +27,11 @@ public class MapHub : Hub
 
     public async Task ReportNewIncident(Guid incidentId, double lat, double lng, string type, string severity)
     {
+        if (!IsAuthorityOrHigher(Context.User))
+        {
+            return;
+        }
+
         await Clients.All.SendAsync("NewIncidentReported", new
         {
             IncidentId = incidentId,
@@ -39,6 +45,11 @@ public class MapHub : Hub
 
     public async Task IncidentResolved(Guid incidentId)
     {
+        if (!IsAuthorityOrHigher(Context.User))
+        {
+            return;
+        }
+
         await Clients.All.SendAsync("IncidentResolved", new
         {
             IncidentId = incidentId,
@@ -56,9 +67,15 @@ public class MapHub : Hub
         var userId = Context.UserIdentifier;
         if (userId != null)
         {
-            _userLocations.Remove(userId);
+            _userLocations.TryRemove(userId, out _);
             await Clients.Others.SendAsync("UserOffline", new { UserId = userId });
         }
         await base.OnDisconnectedAsync(exception);
+    }
+
+    private static bool IsAuthorityOrHigher(System.Security.Claims.ClaimsPrincipal? user)
+    {
+        if (user is null) return false;
+        return user.IsInRole("Authority") || user.IsInRole("Admin") || user.IsInRole("SuperAdmin");
     }
 }

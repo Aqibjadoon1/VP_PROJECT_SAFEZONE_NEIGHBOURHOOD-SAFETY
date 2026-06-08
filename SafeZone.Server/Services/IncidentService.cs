@@ -10,15 +10,18 @@ public class IncidentService : IIncidentService
     private readonly SafeZoneDbContext _context;
     private readonly IGmailNotificationService? _gmail;
     private readonly ISlackNotificationService? _slack;
+    private readonly ILogger<IncidentService>? _logger;
 
     public IncidentService(
         SafeZoneDbContext context,
         IGmailNotificationService? gmail = null,
-        ISlackNotificationService? slack = null)
+        ISlackNotificationService? slack = null,
+        ILogger<IncidentService>? logger = null)
     {
         _context = context;
         _gmail = gmail;
         _slack = slack;
+        _logger = logger;
     }
 
     public async Task<IncidentResponseDto> CreateIncidentAsync(CreateIncidentDto dto, Guid? reporterId)
@@ -32,7 +35,7 @@ public class IncidentService : IIncidentService
             IncidentId = Guid.NewGuid(),
             IncidentNumber = await GenerateIncidentNumberAsync(),
             CategoryId = dto.CategoryId,
-            ReporterId = dto.IsAnonymous ? null : reporterId,
+            ReporterId = reporterId,
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             Address = dto.Address ?? string.Empty,
@@ -56,18 +59,69 @@ public class IncidentService : IIncidentService
         if (reporterId.HasValue && _gmail != null)
         {
             var reporter = await _context.Users.FindAsync(reporterId.Value);
-            if (reporter?.PhoneNumber != null)
+            var recipientEmail = reporter?.Email ?? reporter?.UserName;
+            if (!string.IsNullOrWhiteSpace(recipientEmail))
             {
-                _ = _gmail.SendIncidentAlertAsync(reporter.PhoneNumber, dto.Title, dto.Severity.ToString());
+                try
+                {
+                    var sent = await _gmail.SendIncidentAlertAsync(recipientEmail, dto.Title, dto.Severity.ToString());
+                    if (!sent)
+                    {
+                        _logger?.LogWarning("[Incident Notification] Gmail alert was not sent to {Email}. Check Gmail API configuration.", recipientEmail);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to send Gmail incident alert to {Email}.", recipientEmail);
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("[Incident Notification] Cannot send email alert: reporter {UserId} has no email address.", reporterId.Value);
             }
         }
 
         if (_slack != null && (dto.Severity == SeverityLevel.Critical || dto.Severity == SeverityLevel.High))
         {
-            _ = _slack.SendAlertAsync(
-                dto.Title,
-                $"New {dto.Severity} severity incident at {dto.Address}: {dto.Description}",
-                dto.Severity.ToString());
+            try
+            {
+                var sent = await _slack.SendAlertAsync(
+                    dto.Title,
+                    $"New {dto.Severity} severity incident at {dto.Address}: {dto.Description}",
+                    dto.Severity.ToString());
+                if (!sent)
+                {
+                    _logger?.LogWarning("[Incident Notification] Slack alert was not sent for incident '{Title}'. Check Slack webhook configuration.", dto.Title);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to send Slack incident alert.");
+            }
+        }
+
+        // Notify all superadmins
+        try
+        {
+            var superAdminEmails = await _context.Users
+                .Where(u => u.Role == UserRole.SuperAdmin && u.IsActive)
+                .Select(u => u.Email ?? u.UserName)
+                .Where(email => !string.IsNullOrWhiteSpace(email))
+                .ToListAsync();
+
+            foreach (var adminEmail in superAdminEmails)
+            {
+                if (_gmail != null)
+                {
+                    await _gmail.SendEmailAsync(adminEmail!,
+                        $"[{dto.Severity}] New Incident: {dto.Title}",
+                        $"A new incident has been reported.\n\nTitle: {dto.Title}\nSeverity: {dto.Severity}\nLocation: {dto.Address ?? "N/A"}\nDescription: {dto.Description?[..Math.Min(dto.Description.Length, 300)]}\nReported: {incident.ReportedAt:MMM dd, yyyy HH:mm}\n\nView at: /authority/field-reports");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to send superadmin incident notifications.");
         }
 
         return MapToResponse(incident, category);
@@ -76,6 +130,7 @@ public class IncidentService : IIncidentService
     public async Task<IncidentResponseDto?> GetIncidentByIdAsync(Guid incidentId)
     {
         var incident = await _context.Incidents
+            .AsNoTracking()
             .Include(i => i.Category)
             .Include(i => i.Reporter)
             .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
@@ -83,9 +138,10 @@ public class IncidentService : IIncidentService
         return incident == null ? null : MapToResponse(incident, incident.Category);
     }
 
-     public async Task<List<IncidentListDto>> GetMyIncidentsAsync(Guid reporterId)
+    public async Task<List<IncidentListDto>> GetMyIncidentsAsync(Guid reporterId)
     {
         return await _context.Incidents
+            .AsNoTracking()
             .Include(i => i.Category)
             .Where(i => i.ReporterId == reporterId)
             .OrderByDescending(i => i.ReportedAt)
@@ -93,8 +149,8 @@ public class IncidentService : IIncidentService
             {
                 IncidentId = i.IncidentId,
                 IncidentNumber = i.IncidentNumber,
-                CategoryName = i.Category.Name,
-                CategoryIcon = i.Category.Icon,
+                CategoryName = i.Category != null ? i.Category.Name : "N/A",
+                CategoryIcon = i.Category != null ? i.Category!.Icon : null,
                 Title = i.Title,
                 Description = i.Description,
                 Status = i.Status,
@@ -114,6 +170,7 @@ public class IncidentService : IIncidentService
         Guid? categoryId = null)
     {
         var query = _context.Incidents
+            .AsNoTracking()
             .Include(i => i.Category)
             .AsQueryable();
 
@@ -126,14 +183,14 @@ public class IncidentService : IIncidentService
         if (categoryId.HasValue)
             query = query.Where(i => i.CategoryId == categoryId.Value);
 
-         return await query
+        return await query
             .OrderByDescending(i => i.ReportedAt)
             .Select(i => new IncidentListDto
             {
                 IncidentId = i.IncidentId,
                 IncidentNumber = i.IncidentNumber,
-                CategoryName = i.Category.Name,
-                CategoryIcon = i.Category.Icon,
+                CategoryName = i.Category != null ? i.Category.Name : "N/A",
+                CategoryIcon = i.Category != null ? i.Category!.Icon : null,
                 Title = i.Title,
                 Description = i.Description,
                 Status = i.Status,
@@ -219,6 +276,7 @@ public class IncidentService : IIncidentService
         IncidentStatus? status = null)
     {
         var query = _context.Incidents
+            .AsNoTracking()
             .Include(i => i.Category)
             .AsQueryable();
 
@@ -247,9 +305,9 @@ public class IncidentService : IIncidentService
                 Lat = i.Latitude,
                 Lng = i.Longitude,
                 Title = i.Title,
-                CategoryName = i.Category.Name,
-                CategoryIcon = i.Category.Icon,
-                CategoryColor = i.Category.Color,
+                CategoryName = i.Category != null ? i.Category.Name : "N/A",
+                CategoryIcon = i.Category != null ? i.Category!.Icon : null,
+                CategoryColor = i.Category != null ? i.Category.Color : null,
                 Status = i.Status,
                 Severity = i.Severity,
                 ReportedAt = i.ReportedAt
@@ -260,6 +318,7 @@ public class IncidentService : IIncidentService
     public async Task<List<HeatmapPointDto>> GetHeatmapDataAsync(DateTime? since = null)
     {
         var query = _context.Incidents
+            .AsNoTracking()
             .Where(i => i.Status != IncidentStatus.Closed)
             .AsQueryable();
 
@@ -282,6 +341,7 @@ public class IncidentService : IIncidentService
     public async Task<List<CategoryDto>> GetCategoriesAsync()
     {
         return await _context.IncidentCategories
+            .AsNoTracking()
             .Select(c => new CategoryDto
             {
                 CategoryId = c.CategoryId,
@@ -296,53 +356,54 @@ public class IncidentService : IIncidentService
     public async Task<int> GetIncidentCountByStatusAsync(IncidentStatus status)
     {
         return await _context.Incidents
+            .AsNoTracking()
             .CountAsync(i => i.Status == status);
     }
 
     public async Task<Dictionary<SeverityLevel, int>> GetIncidentCountBySeverityAsync()
     {
         return await _context.Incidents
+            .AsNoTracking()
             .Where(i => i.Status != IncidentStatus.Closed)
             .GroupBy(i => i.Severity)
             .Select(g => new { Severity = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Severity, x => x.Count);
     }
 
-    private static readonly SemaphoreSlim _numberLock = new(1, 1);
-    private static int _sequenceCounter;
-
-    private string GenerateIncidentNumber()
+    private static string GenerateIncidentNumber()
     {
         var timestamp = DateTime.UtcNow;
-        var random = new Random().Next(1000, 9999);
-        return $"INC-{timestamp:yyyyMMdd}-{random}";
+        var random = Random.Shared.Next(1000, 9999);
+        return $"INC-{timestamp:yyyyMMdd}-{timestamp:HHmmss}-{random}";
     }
 
     private async Task<string> GenerateIncidentNumberAsync()
     {
-        await _numberLock.WaitAsync();
-        try
+        var timestamp = DateTime.UtcNow;
+        var random = Random.Shared.Next(1000, 9999);
+        var number = $"INC-{timestamp:yyyyMMdd}-{timestamp:HHmmss}-{random}";
+
+        // Ensure uniqueness by checking database
+        var exists = await _context.Incidents.AnyAsync(i => i.IncidentNumber == number);
+        if (exists)
         {
-            var timestamp = DateTime.UtcNow;
-            var seq = Interlocked.Increment(ref _sequenceCounter) % 10000;
-            return $"INC-{timestamp:yyyyMMdd}-{seq:D4}";
+            random = Random.Shared.Next(1000, 9999);
+            number = $"INC-{timestamp:yyyyMMdd}-{timestamp:HHmmss}-{random}";
         }
-        finally
-        {
-            _numberLock.Release();
-        }
+
+        return number;
     }
 
-    private IncidentResponseDto MapToResponse(Incident incident, IncidentCategory category)
+    private IncidentResponseDto MapToResponse(Incident incident, IncidentCategory? category)
     {
         return new IncidentResponseDto
         {
             IncidentId = incident.IncidentId,
             IncidentNumber = incident.IncidentNumber,
             CategoryId = incident.CategoryId,
-            CategoryName = category.Name,
-            CategoryIcon = category.Icon,
-            CategoryColor = category.Color,
+            CategoryName = category?.Name ?? "N/A",
+            CategoryIcon = category?.Icon,
+            CategoryColor = category?.Color,
             ReporterId = incident.ReporterId,
             ReporterName = incident.IsAnonymous ? "Anonymous" : incident.Reporter?.FullName,
             Latitude = incident.Latitude,

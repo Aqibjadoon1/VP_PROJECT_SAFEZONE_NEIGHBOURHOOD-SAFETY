@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using SafeZone.Server.DTOs;
 using SafeZone.Server.Hubs;
+using SafeZone.Server.Models;
 using SafeZone.Server.Services;
 
 namespace SafeZone.Server.Controllers;
@@ -15,13 +16,16 @@ public class IncidentController : ControllerBase
 {
     private readonly IIncidentService _incidentService;
     private readonly IHubContext<MapHub> _mapHub;
+    private readonly ILogger<IncidentController> _logger;
 
     public IncidentController(
         IIncidentService incidentService,
-        IHubContext<MapHub> mapHub)
+        IHubContext<MapHub> mapHub,
+        ILogger<IncidentController> logger)
     {
         _incidentService = incidentService;
         _mapHub = mapHub;
+        _logger = logger;
     }
 
     private Guid? GetCurrentUserId()
@@ -29,6 +33,8 @@ public class IncidentController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
+
+    private bool IsAuthorityOrHigher() => User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
 
     [HttpGet("categories")]
     [AllowAnonymous]
@@ -39,25 +45,35 @@ public class IncidentController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<IncidentResponseDto>> CreateIncident(CreateIncidentDto dto)
+    public async Task<ActionResult<IncidentResponseDto>> CreateIncident([FromBody] CreateIncidentDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         var userId = GetCurrentUserId();
         try
         {
             var result = await _incidentService.CreateIncidentAsync(dto, userId);
 
-            await _mapHub.Clients.All.SendAsync("NewIncidentReported", new
+            try
             {
-                result.IncidentId,
-                result.IncidentNumber,
-                Lat = result.Latitude,
-                Lng = result.Longitude,
-                result.Title,
-                CategoryName = result.CategoryName,
-                result.Severity,
-                result.Status,
-                Timestamp = DateTime.UtcNow
-            });
+                await _mapHub.Clients.All.SendAsync("NewIncidentReported", new
+                {
+                    result.IncidentId,
+                    result.IncidentNumber,
+                    Lat = result.Latitude,
+                    Lng = result.Longitude,
+                    result.Title,
+                    CategoryName = result.CategoryName,
+                    result.Severity,
+                    result.Status,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception hubEx)
+            {
+                _logger.LogError(hubEx, "Failed to broadcast NewIncidentReported to SignalR hub");
+            }
 
             return CreatedAtAction(nameof(GetIncident), new { id = result.IncidentId }, result);
         }
@@ -73,6 +89,10 @@ public class IncidentController : ControllerBase
         var incident = await _incidentService.GetIncidentByIdAsync(id);
         if (incident == null)
             return NotFound(new { message = "Incident not found" });
+
+        var userId = GetCurrentUserId();
+        if (!IsAuthorityOrHigher() && incident.ReporterId != userId)
+            return Forbid();
 
         return Ok(incident);
     }
@@ -95,31 +115,60 @@ public class IncidentController : ControllerBase
         [FromQuery] int? severity,
         [FromQuery] Guid? categoryId)
     {
-        var incidents = await _incidentService.GetAllIncidentsAsync(
-            status.HasValue ? (Models.IncidentStatus)status.Value : null,
-            severity.HasValue ? (Models.SeverityLevel)severity.Value : null,
-            categoryId);
+        IncidentStatus? incidentStatus = null;
+        if (status.HasValue)
+        {
+            if (!Enum.IsDefined(typeof(IncidentStatus), status.Value))
+                return BadRequest(new { message = "Invalid status value." });
+            incidentStatus = (IncidentStatus)status.Value;
+        }
 
+        SeverityLevel? severityLevel = null;
+        if (severity.HasValue)
+        {
+            if (!Enum.IsDefined(typeof(SeverityLevel), severity.Value))
+                return BadRequest(new { message = "Invalid severity value." });
+            severityLevel = (SeverityLevel)severity.Value;
+        }
+
+        var incidents = await _incidentService.GetAllIncidentsAsync(incidentStatus, severityLevel, categoryId);
         return Ok(incidents);
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<IncidentResponseDto>> UpdateIncident(Guid id, UpdateIncidentDto dto)
+    public async Task<ActionResult<IncidentResponseDto>> UpdateIncident(Guid id, [FromBody] UpdateIncidentDto dto)
     {
-        var userId = GetCurrentUserId();
-        var result = await _incidentService.UpdateIncidentAsync(id, dto, userId);
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
+        var userId = GetCurrentUserId();
+
+        var incident = await _incidentService.GetIncidentByIdAsync(id);
+        if (incident == null)
+            return NotFound(new { message = "Incident not found" });
+
+        if (!IsAuthorityOrHigher() && incident.ReporterId != userId)
+            return Forbid();
+
+        var result = await _incidentService.UpdateIncidentAsync(id, dto, userId);
         if (result == null)
             return NotFound(new { message = "Incident not found" });
 
         if (dto.Status.HasValue)
         {
-            await _mapHub.Clients.All.SendAsync("IncidentUpdated", new
+            try
             {
-                result.IncidentId,
-                Status = dto.Status.Value.ToString(),
-                Timestamp = DateTime.UtcNow
-            });
+                await _mapHub.Clients.All.SendAsync("IncidentUpdated", new
+                {
+                    result.IncidentId,
+                    Status = dto.Status.Value.ToString(),
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception hubEx)
+            {
+                _logger.LogError(hubEx, "Failed to broadcast IncidentUpdated to SignalR hub");
+            }
         }
 
         return Ok(result);
@@ -129,28 +178,45 @@ public class IncidentController : ControllerBase
     [Authorize(Roles = "Authority,SuperAdmin")]
     public async Task<ActionResult<IncidentResponseDto>> UpdateStatus(Guid id, [FromQuery] int status)
     {
+        if (!Enum.IsDefined(typeof(IncidentStatus), status))
+            return BadRequest(new { message = "Invalid status value." });
+
         var userId = GetCurrentUserId();
-        var incidentStatus = (Models.IncidentStatus)status;
+        var incidentStatus = (IncidentStatus)status;
 
         var result = await _incidentService.UpdateStatusAsync(id, incidentStatus, userId);
         if (result == null)
             return NotFound(new { message = "Incident not found" });
 
-        await _mapHub.Clients.All.SendAsync("IncidentUpdated", new
+        try
         {
-            result.IncidentId,
-            Status = incidentStatus.ToString(),
-            Timestamp = DateTime.UtcNow
-        });
-
-        if (incidentStatus == Models.IncidentStatus.Resolved || 
-            incidentStatus == Models.IncidentStatus.Closed)
-        {
-            await _mapHub.Clients.All.SendAsync("IncidentResolved", new
+            await _mapHub.Clients.All.SendAsync("IncidentUpdated", new
             {
                 result.IncidentId,
+                Status = incidentStatus.ToString(),
                 Timestamp = DateTime.UtcNow
             });
+        }
+        catch (Exception hubEx)
+        {
+            _logger.LogError(hubEx, "Failed to broadcast IncidentUpdated to SignalR hub");
+        }
+
+        if (incidentStatus == IncidentStatus.Resolved ||
+            incidentStatus == IncidentStatus.Closed)
+        {
+            try
+            {
+                await _mapHub.Clients.All.SendAsync("IncidentResolved", new
+                {
+                    result.IncidentId,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception hubEx)
+            {
+                _logger.LogError(hubEx, "Failed to broadcast IncidentResolved to SignalR hub");
+            }
         }
 
         return Ok(result);
@@ -160,10 +226,10 @@ public class IncidentController : ControllerBase
     [Authorize(Roles = "Authority,SuperAdmin")]
     public async Task<ActionResult<object>> GetStats()
     {
-        var pending = await _incidentService.GetIncidentCountByStatusAsync(Models.IncidentStatus.Pending);
-        var assigned = await _incidentService.GetIncidentCountByStatusAsync(Models.IncidentStatus.Assigned);
-        var inProgress = await _incidentService.GetIncidentCountByStatusAsync(Models.IncidentStatus.InProgress);
-        var resolved = await _incidentService.GetIncidentCountByStatusAsync(Models.IncidentStatus.Resolved);
+        var pending = await _incidentService.GetIncidentCountByStatusAsync(IncidentStatus.Pending);
+        var assigned = await _incidentService.GetIncidentCountByStatusAsync(IncidentStatus.Assigned);
+        var inProgress = await _incidentService.GetIncidentCountByStatusAsync(IncidentStatus.InProgress);
+        var resolved = await _incidentService.GetIncidentCountByStatusAsync(IncidentStatus.Resolved);
         var bySeverity = await _incidentService.GetIncidentCountBySeverityAsync();
 
         return Ok(new

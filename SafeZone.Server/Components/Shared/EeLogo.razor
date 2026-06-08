@@ -1,0 +1,64 @@
+<svg class="ee-logo safezone-logo @Class"
+     width="@ResolvedWidth"
+     height="@ResolvedHeight"
+     viewBox="0 0 64 64"
+     role="img"
+     aria-label="SafeZone">
+    <defs>
+        <linearGradient id="safezone-shield-gradient" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#00ff88" />
+            <stop offset="0.52" stop-color="#00d4ff" />
+            <stop offset="1" stop-color="#8b5cf6" />
+        </linearGradient>
+        <linearGradient id="safezone-core-gradient" x1="22" y1="15" x2="43" y2="49" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#eafff6" />
+            <stop offset="1" stop-color="#00ff88" />
+        </linearGradient>
+        <filter id="safezone-logo-glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <path class="safezone-logo-shield"
+          d="M32 4 55 12v16c0 15.2-8.8 25.9-23 32C17.8 53.9 9 43.2 9 28V12L32 4Z"
+          fill="rgba(7, 18, 25, 0.92)"
+          stroke="url(#safezone-shield-gradient)"
+          stroke-width="2.6"
+          stroke-linejoin="round"
+          filter="url(#safezone-logo-glow)" />
+
+    <path class="safezone-logo-helix safezone-logo-helix-a"
+          d="M23 15c14 7 14 27 0 34"
+          fill="none"
+          stroke="url(#safezone-core-gradient)"
+          stroke-width="4.2"
+          stroke-linecap="round" />
+    <path class="safezone-logo-helix safezone-logo-helix-b"
+          d="M41 15c-14 7-14 27 0 34"
+          fill="none"
+          stroke="url(#safezone-shield-gradient)"
+          stroke-width="4.2"
+          stroke-linecap="round" />
+
+    <g class="safezone-logo-rungs" stroke="#dffff2" stroke-width="2" stroke-linecap="round">
+        <path d="M25 20h14" />
+        <path d="M22 27h20" />
+        <path d="M22 35h20" />
+        <path d="M25 43h14" />
+    </g>
+    <circle cx="32" cy="32" r="2.4" fill="#00ff88" filter="url(#safezone-logo-glow)" />
+</svg>
+
+@code {
+    [Parameter] public int Size { get; set; } = 44;
+    [Parameter] public int? Width { get; set; }
+    [Parameter] public int? Height { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+
+    private int ResolvedWidth => Width ?? Size;
+    private int ResolvedHeight => Height ?? Size;
+}

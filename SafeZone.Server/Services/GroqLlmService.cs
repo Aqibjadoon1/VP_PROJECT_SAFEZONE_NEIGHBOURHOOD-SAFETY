@@ -7,7 +7,7 @@ using SafeZone.Server.Helpers;
 
 namespace SafeZone.Server.Services;
 
- public class GroqLlmService : ILanguageModel
+public class GroqLlmService : ILanguageModel
 {
     private readonly HttpClient _httpClient;
     private readonly string _modelName;
@@ -15,6 +15,7 @@ namespace SafeZone.Server.Services;
     private readonly string _endpoint;
     private readonly ILogger<GroqLlmService>? _logger;
     private readonly bool _isConfigured;
+    private readonly bool _ownsHttpClient;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,10 +32,11 @@ namespace SafeZone.Server.Services;
         ILogger<GroqLlmService>? logger = null,
         HttpClient? httpClient = null)
     {
-         _apiKey = apiKey ?? Environment.GetEnvironmentVariable("GROQ_API_KEY");
+        _apiKey = apiKey ?? Environment.GetEnvironmentVariable("GROQ_API_KEY");
         _modelName = modelName;
-        _endpoint = endpoint.TrimEnd('/');
+        _endpoint = (endpoint ?? throw new ArgumentNullException(nameof(endpoint))).TrimEnd('/');
         _logger = logger;
+        _ownsHttpClient = httpClient == null;
         _httpClient = httpClient ?? new HttpClient();
 
         if (!string.IsNullOrEmpty(_apiKey))
@@ -106,11 +108,11 @@ namespace SafeZone.Server.Services;
             };
 
             var json = JsonSerializer.Serialize(requestBody, JsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             _logger?.LogDebug("Calling Groq API with {MessageCount} messages", messages.Count);
 
-            var response = await RetryHelper.WithRetryAsync(async ct =>
+            using var response = await RetryHelper.WithRetryAsync(async ct =>
             {
                 var resp = await _httpClient.PostAsync(
                     $"{_endpoint}/chat/completions",
@@ -198,7 +200,10 @@ namespace SafeZone.Server.Services;
 
     public void Dispose()
     {
-        _httpClient.Dispose();
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
         GC.SuppressFinalize(this);
     }
 }

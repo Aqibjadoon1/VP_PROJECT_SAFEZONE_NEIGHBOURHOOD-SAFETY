@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using System.Globalization;
 using System.Text.Json;
 using SafeZone.Server.DTOs;
 using SafeZone.Server.Hubs;
@@ -15,20 +16,29 @@ public class ElevenLabsWebhookController : ControllerBase
     private readonly IIncidentService _incidentService;
     private readonly IHubContext<MapHub> _mapHub;
     private readonly ILogger<ElevenLabsWebhookController> _logger;
+    private readonly IConfiguration _configuration;
 
     public ElevenLabsWebhookController(
         IIncidentService incidentService,
         IHubContext<MapHub> mapHub,
-        ILogger<ElevenLabsWebhookController> logger)
+        ILogger<ElevenLabsWebhookController> logger,
+        IConfiguration configuration)
     {
         _incidentService = incidentService;
         _mapHub = mapHub;
         _logger = logger;
+        _configuration = configuration;
     }
 
     [HttpPost]
     public async Task<IActionResult> ReceiveIncidentReport([FromBody] ElevenLabsWebhookPayload payload)
     {
+        if (!IsSignatureValid(Request))
+        {
+            _logger.LogWarning("ElevenLabs webhook rejected: invalid signature.");
+            return Unauthorized(new { message = "Invalid signature." });
+        }
+
         try
         {
             _logger.LogInformation(
@@ -43,7 +53,7 @@ public class ElevenLabsWebhookController : ControllerBase
             return StatusCode(500, new ElevenLabsWebhookResponse
             {
                 Success = false,
-                Message = $"Processing failed: {ex.Message}"
+                Message = "Processing failed."
             });
         }
     }
@@ -51,6 +61,12 @@ public class ElevenLabsWebhookController : ControllerBase
     [HttpPost("tool-call")]
     public async Task<IActionResult> ReceiveToolCall([FromBody] JsonElement rawPayload)
     {
+        if (!IsSignatureValid(Request))
+        {
+            _logger.LogWarning("ElevenLabs tool call rejected: invalid signature.");
+            return Unauthorized(new { message = "Invalid signature." });
+        }
+
         try
         {
             _logger.LogInformation("ElevenLabs tool call received: {Payload}", rawPayload.ToString());
@@ -98,9 +114,38 @@ public class ElevenLabsWebhookController : ControllerBase
             return StatusCode(500, new ElevenLabsWebhookResponse
             {
                 Success = false,
-                Message = $"Tool call processing failed: {ex.Message}"
+                Message = "Tool call processing failed."
             });
         }
+    }
+
+    private bool IsSignatureValid(HttpRequest request)
+    {
+        var secret = _configuration["ElevenLabs:WebhookSecret"];
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            var env = _configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production";
+            var allowUnsignedServerTools = _configuration.GetValue<bool>("ElevenLabs:AllowUnsignedServerTools");
+            if (!string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase) && !allowUnsignedServerTools)
+            {
+                _logger.LogError("ElevenLabs webhook rejected: WebhookSecret is not configured in production.");
+                return false;
+            }
+            _logger.LogWarning(
+                "ElevenLabs webhook accepted without signature verification. Environment={Environment}, AllowUnsignedServerTools={AllowUnsignedServerTools}",
+                env,
+                allowUnsignedServerTools);
+            return true;
+        }
+
+        // Placeholder for HMAC validation. In production, compute HMAC-SHA256 of the
+        // raw request body using the shared secret and compare with the X-ElevenLabs-Signature header.
+        request.Headers.TryGetValue("X-ElevenLabs-Signature", out var signature);
+        if (string.IsNullOrWhiteSpace(signature))
+            return false;
+
+        // TODO: Implement actual HMAC verification when ElevenLabs provides documentation.
+        return true;
     }
 
     private async Task<IActionResult> ProcessAndCreateIncident(ElevenLabsWebhookPayload payload)
@@ -126,8 +171,8 @@ public class ElevenLabsWebhookController : ControllerBase
                 Title = title,
                 Description = description,
                 Severity = severity,
-                Latitude = lat,
-                Longitude = lng,
+                Latitude = lat ?? 0,
+                Longitude = lng ?? 0,
                 Address = dynamicVars.Address ?? "Reported via ElevenLabs Voice Agent",
                 IsAnonymous = isAnonymous,
                 IncidentDateTime = DateTime.UtcNow
@@ -135,17 +180,24 @@ public class ElevenLabsWebhookController : ControllerBase
 
             var incident = await _incidentService.CreateIncidentAsync(createDto, reporterId: null);
 
-            await _mapHub.Clients.All.SendAsync("ReportNewIncident", new
+            try
             {
-                incident.IncidentId,
-                incident.Title,
-                incident.CategoryName,
-                incident.Latitude,
-                incident.Longitude,
-                incident.Severity,
-                incident.Status,
-                incident.ReportedAt
-            });
+                await _mapHub.Clients.All.SendAsync("ReportNewIncident", new
+                {
+                    incident.IncidentId,
+                    incident.Title,
+                    incident.CategoryName,
+                    incident.Latitude,
+                    incident.Longitude,
+                    incident.Severity,
+                    incident.Status,
+                    incident.ReportedAt
+                });
+            }
+            catch (Exception hubEx)
+            {
+                _logger.LogError(hubEx, "Failed to broadcast ReportNewIncident to SignalR hub from ElevenLabs webhook");
+            }
 
             _logger.LogInformation(
                 "Incident created from ElevenLabs webhook. Id={IncidentId}, Number={Number}, Category={Category}",
@@ -165,13 +217,33 @@ public class ElevenLabsWebhookController : ControllerBase
             return StatusCode(500, new ElevenLabsWebhookResponse
             {
                 Success = false,
-                Message = $"Processing failed: {ex.Message}"
+                Message = "Processing failed."
             });
         }
     }
 
     private static ElevenLabsDynamicVariables ResolveDynamicVariables(ElevenLabsWebhookPayload payload)
     {
+        if (!string.IsNullOrWhiteSpace(payload.Category)
+            || !string.IsNullOrWhiteSpace(payload.Description)
+            || !string.IsNullOrWhiteSpace(payload.Address)
+            || !string.IsNullOrWhiteSpace(payload.Severity)
+            || payload.IsAnonymous.HasValue
+            || payload.Latitude.HasValue
+            || payload.Longitude.HasValue)
+        {
+            return new ElevenLabsDynamicVariables
+            {
+                Category = payload.Category,
+                Description = payload.Description,
+                Address = payload.Address,
+                Severity = payload.Severity,
+                IsAnonymous = payload.IsAnonymous?.ToString(),
+                Latitude = payload.Latitude?.ToString(CultureInfo.InvariantCulture),
+                Longitude = payload.Longitude?.ToString(CultureInfo.InvariantCulture)
+            };
+        }
+
         if (payload.DynamicVariables is { Count: > 0 })
         {
             return new ElevenLabsDynamicVariables
@@ -264,7 +336,7 @@ public class ElevenLabsWebhookController : ControllerBase
         };
     }
 
-    private static (double lat, double lng) ResolveLocation(ElevenLabsDynamicVariables vars)
+    private static (double? lat, double? lng) ResolveLocation(ElevenLabsDynamicVariables vars)
     {
         if (double.TryParse(vars.Latitude, out var lat) && double.TryParse(vars.Longitude, out var lng)
             && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)
@@ -272,7 +344,7 @@ public class ElevenLabsWebhookController : ControllerBase
             return (lat, lng);
         }
 
-        return (33.6844, 73.0479);
+        return (null, null);
     }
 
     private static bool ResolveIsAnonymous(string? isAnonymous)

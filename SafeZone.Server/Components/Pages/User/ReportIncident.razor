@@ -1,11 +1,13 @@
 @page "/user/report-incident"
 @layout DashboardLayout
 @attribute [Authorize(Roles = "Resident")]
+@implements IDisposable
 @inject NavigationManager Navigation
 @inject IIncidentService IncidentSvc
 @inject ToastService ToastSvc
 @inject AuthenticationStateProvider AuthState
 @inject UserManager<User> UserManager
+@inject IJSRuntime JS
 
 <div class="ambient-glow-2"></div>
 
@@ -209,7 +211,7 @@
                         </div>
                         <div class="p-4 rounded-lg" style="background: var(--glass);">
                             <p class="text-xs text-muted mb-1">Location</p>
-                            <p class="font-medium">@(selectedLat.HasValue ? $"{selectedLat.Value:F4}, {selectedLng.Value:F4}" : "-")</p>
+                            <p class="font-medium">@(selectedLat.HasValue && selectedLng.HasValue ? $"{selectedLat.Value:F4}, {selectedLng.Value:F4}" : "-")</p>
                         </div>
                         <div class="p-4 rounded-lg" style="background: var(--glass);">
                             <p class="text-xs text-muted mb-1">Description</p>
@@ -420,8 +422,8 @@
     private bool isSubmitting;
     private Guid? selectedCategoryId;
     private int selectedSeverity = 1;
-    private double? selectedLat;
-    private double? selectedLng;
+    private double? selectedLat = null;
+    private double? selectedLng = null;
     private string incidentTitle = "";
     private string locationName = "";
     private string incidentDescription = "";
@@ -430,6 +432,7 @@
     private string submittedIncidentId = "";
 
     private List<CategoryDto> categories = [];
+    private DotNetObjectReference<ReportIncident>? _dotNetRef;
 
     private CategoryDto? SelectedCategory => categories.Find(c => c.CategoryId == selectedCategoryId);
 
@@ -461,6 +464,35 @@
         {
             categories = [.. DefaultCategories];
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (currentStep == 2)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("safezoneMap.init", "report-map", new { zoomControl = true, scrollWheelZoom = true });
+                _dotNetRef?.Dispose();
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("safezoneMap.enableDotNetLocationPicker", "report-map", _dotNetRef);
+            }
+            catch { /* ignore for prerendering */ }
+        }
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        _dotNetRef = null;
+    }
+
+    [JSInvokable]
+    public void OnLocationSelected(double lat, double lng)
+    {
+        selectedLat = lat;
+        selectedLng = lng;
+        StateHasChanged();
     }
 
     private string GetStepIndicatorClass(int step)
@@ -514,9 +546,36 @@
         currentStep = step;
     }
 
-    private void UseMyLocation()
+    private async Task UseMyLocation()
     {
-        ToastSvc.ShowInfo("Geolocation is not available in this view. Please use the map to select a location.");
+        try
+        {
+            var pos = await JS.InvokeAsync<GeolocationResult>("safezoneMap.getCurrentPosition");
+            if (pos != null)
+            {
+                selectedLat = pos.lat;
+                selectedLng = pos.lng;
+                await JS.InvokeVoidAsync("safezoneMap.panTo", "report-map", pos.lat, pos.lng, 15);
+                await JS.InvokeVoidAsync("safezoneMap.enableDotNetLocationPicker", "report-map", _dotNetRef);
+                OnLocationSelected(pos.lat, pos.lng);
+                if (pos.fallback) ToastSvc.ShowInfo("Using Islamabad default location — GPS unavailable. Click the map to refine.");
+                else ToastSvc.ShowSuccess("Location detected!");
+            }
+        }
+        catch
+        {
+            selectedLat = 33.6844;
+            selectedLng = 73.0479;
+            ToastSvc.ShowInfo("Using Islamabad default location. Click the map to refine.");
+        }
+        StateHasChanged();
+    }
+
+    private class GeolocationResult
+    {
+        public double lat { get; set; }
+        public double lng { get; set; }
+        public bool fallback { get; set; }
     }
 
     private DateTime GetIncidentDateTime()

@@ -37,15 +37,19 @@ public sealed partial class GmailNotificationService : IGmailNotificationService
 
     public async Task<bool> SendEmailAsync(string to, string subject, string body)
     {
-        if (!_isConfigured)
+        if (string.IsNullOrWhiteSpace(to) || !IsValidEmail(to))
         {
-            _logger.LogInformation("[Gmail API] Not configured — logging: {Subject} to {Recipient}", subject, to);
+            _logger.LogWarning("[Gmail API] Invalid recipient: {Recipient}", to);
             return false;
         }
 
-        if (!IsValidEmail(to))
+        if (!_isConfigured)
         {
-            _logger.LogWarning("[Gmail API] Invalid recipient: {Recipient}", to);
+            _logger.LogWarning(
+                "[Gmail API] Not configured — cannot send email to {To}. " +
+                "Set environment variables: Gmail__ClientId, Gmail__ClientSecret, Gmail__RefreshToken, Gmail__FromEmail. " +
+                "Would have sent:\n  Subject: {Subject}\n  Body: {Body}",
+                to, subject, body);
             return false;
         }
 
@@ -58,8 +62,8 @@ public sealed partial class GmailNotificationService : IGmailNotificationService
             });
 
             var mimeMessage = new MimeMessage();
-            mimeMessage.From.Add(new MailboxAddress(_applicationName, _fromEmail));
-            mimeMessage.To.Add(new MailboxAddress("", to));
+            mimeMessage.From.Add(new MailboxAddress(_applicationName, _fromEmail!));
+            mimeMessage.To.Add(new MailboxAddress("", to!));
             mimeMessage.Subject = subject;
             mimeMessage.Body = new TextPart("plain") { Text = body };
 
@@ -115,5 +119,9 @@ public sealed partial class GmailNotificationService : IGmailNotificationService
 
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
     private static partial Regex EmailRegex();
-    private static bool IsValidEmail(string email) => EmailRegex().IsMatch(email);
+    private static bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        return EmailRegex().IsMatch(email);
+    }
 }

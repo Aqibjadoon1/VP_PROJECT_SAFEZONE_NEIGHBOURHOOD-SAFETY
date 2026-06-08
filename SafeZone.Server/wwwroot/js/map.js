@@ -8,8 +8,8 @@
 
     const DEFAULT_CENTER = { lat: 33.6844, lng: 73.0479 };
     const DEFAULT_ZOOM = 13;
-    const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-    const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
     function initMap(containerId, options = {}) {
         const element = document.getElementById(containerId);
@@ -50,7 +50,6 @@
             attribution: TILE_ATTRIBUTION,
             maxZoom: 19
         }).addTo(map);
-tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightness(95%) contrast(90%)';
 
         maps[containerId] = map;
         markers[containerId] = [];
@@ -287,6 +286,8 @@ tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightne
             delete markerClusters[containerId];
         }
     }
+
+    function fitBounds(containerId, incidents) {
         const map = maps[containerId];
         const L = window.L;
         if (!map || !L || !Array.isArray(incidents) || incidents.length === 0) return;
@@ -328,6 +329,12 @@ tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightne
             map.off('click', handler);
             if (pickerMarker) map.removeLayer(pickerMarker);
         };
+    }
+
+    function enableDotNetLocationPicker(containerId, dotNetHelper) {
+        return enableLocationPicker(containerId, function(loc) {
+            dotNetHelper.invokeMethodAsync('OnLocationSelected', loc.lat, loc.lng);
+        });
     }
 
     function normalizeHeatPoint(point) {
@@ -407,6 +414,24 @@ tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightne
         delete markers[containerId];
     }
 
+    function getCurrentPosition() {
+        return new Promise(function (resolve) {
+            if (!navigator.geolocation) {
+                resolve({ lat: DEFAULT_CENTER.lat, lng: DEFAULT_CENTER.lng, fallback: true });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, fallback: false });
+                },
+                function () {
+                    resolve({ lat: DEFAULT_CENTER.lat, lng: DEFAULT_CENTER.lng, fallback: true });
+                },
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+            );
+        });
+    }
+
     window.safezoneMap = {
         init: initMap,
         get: getMap,
@@ -418,11 +443,13 @@ tileLayer.getContainer().style.filter = 'invert(95%) hue-rotate(180deg) brightne
         panTo,
         fitBounds,
         enableLocationPicker,
+        enableDotNetLocationPicker,
         addHeatmap,
         removeHeatmap,
         invalidate,
         dispose,
         getSeverityColor,
+        getCurrentPosition,
         DEFAULT_CENTER,
         DEFAULT_ZOOM
     };

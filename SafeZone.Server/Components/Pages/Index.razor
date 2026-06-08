@@ -33,15 +33,15 @@
 
                 <div class="grid grid-cols-3 gap-8 mt-12 pt-8 hero-stats" style="border-top: 1px solid var(--glass-border);">
                     <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="15">0</p>
+                        <p class="hero-stat-value counter" data-target="17">17</p>
                         <p class="text-muted text-sm mt-2">Incident Types</p>
                     </div>
                     <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="24">0</p>
-                        <p class="text-muted text-sm mt-2">/7 Support</p>
+                        <p class="hero-stat-value counter" data-target="24">24/7</p>
+                        <p class="text-muted text-sm mt-2">Support</p>
                     </div>
                     <div class="hero-stat-item">
-                        <p class="hero-stat-value counter" data-target="3">0</p>
+                        <p class="hero-stat-value counter" data-target="4">4</p>
                         <p class="text-muted text-sm mt-2">User Roles</p>
                     </div>
                 </div>
@@ -234,6 +234,7 @@
         if (firstRender)
         {
             try { await JS.InvokeVoidAsync("initHeroEffects"); } catch { }
+            try { await JS.InvokeVoidAsync("initLandingCounters"); } catch { }
         }
     }
 }

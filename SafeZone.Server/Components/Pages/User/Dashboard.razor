@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Resident")]
 @inject IIncidentService IncidentService
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthState
 @implements IAsyncDisposable
 
 <PageHeader Title="Dashboard" Subtitle="Your neighborhood safety overview." />
@@ -18,32 +19,32 @@
 
 <SectionContainer Title="Quick Actions">
     <div class="action-grid dashboard-action-grid">
-        <a href="/user/report-incident" class="action-card feature-card">
+        <a href="/user/report-incident" class="action-card feature-card accent-primary">
             <div class="action-icon" style="background: var(--primary-dim); color: var(--primary);">REP</div>
             <div class="action-label">Report Incident</div>
             <div class="action-desc">Submit a new report</div>
         </a>
-        <a href="/user/sos" class="action-card feature-card">
+        <a href="/user/sos" class="action-card feature-card accent-danger">
             <div class="action-icon" style="background: var(--danger-dim); color: var(--danger);">SOS</div>
             <div class="action-label">SOS Emergency</div>
             <div class="action-desc">Quick emergency call</div>
         </a>
-        <a href="/user/file-fir" class="action-card feature-card">
+        <a href="/user/file-fir" class="action-card feature-card accent-info">
             <div class="action-icon" style="background: var(--info-dim); color: var(--info);">FIR</div>
             <div class="action-label">File FIR</div>
             <div class="action-desc">Official police report</div>
         </a>
-        <a href="/user/my-incidents" class="action-card feature-card">
+        <a href="/user/my-incidents" class="action-card feature-card accent-warning">
             <div class="action-icon" style="background: var(--warning-dim); color: var(--warning);">LOG</div>
             <div class="action-label">My Reports</div>
             <div class="action-desc">View your history</div>
         </a>
-        <a href="/user/notifications" class="action-card feature-card">
+        <a href="/user/notifications" class="action-card feature-card accent-purple">
             <div class="action-icon" style="background: var(--purple-dim); color: var(--purple);">ALT</div>
             <div class="action-label">Alerts</div>
             <div class="action-desc">Safety notifications</div>
         </a>
-        <a href="/user/weather-map" class="action-card feature-card">
+        <a href="/user/weather-map" class="action-card feature-card accent-info">
             <div class="action-icon" style="background: var(--info-dim); color: var(--info);">MAP</div>
             <div class="action-label">Weather Map</div>
             <div class="action-desc">Rain, temperature, pollution</div>
@@ -252,8 +253,17 @@
         IsIncidentsLoading = true;
         try
         {
-            var incidents = await IncidentService.GetAllIncidentsAsync();
-            RecentIncidents = incidents.OrderByDescending(i => i.ReportedAt).ToList();
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                var incidents = await IncidentService.GetMyIncidentsAsync(userId);
+                RecentIncidents = incidents.OrderByDescending(i => i.ReportedAt).ToList();
+            }
+            else
+            {
+                RecentIncidents = new List<IncidentListDto>();
+            }
         }
         catch
         {

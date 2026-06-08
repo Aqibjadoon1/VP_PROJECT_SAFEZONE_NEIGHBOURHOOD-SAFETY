@@ -24,3 +24,8 @@ public record TranscriptSegmentDto
     public string Text { get; init; } = string.Empty;
     public DateTime Timestamp { get; init; }
 }
+
+public record EndCallDto
+{
+    public string? Reason { get; init; }
+}

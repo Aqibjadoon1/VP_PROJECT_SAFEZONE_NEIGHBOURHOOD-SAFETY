@@ -66,4 +66,6 @@ public record SosCallLogDto
     public string? IncidentTitle { get; init; }
     
     public string? TriggeredByUserName { get; init; }
+
+    public Guid? UserId { get; init; }
 }

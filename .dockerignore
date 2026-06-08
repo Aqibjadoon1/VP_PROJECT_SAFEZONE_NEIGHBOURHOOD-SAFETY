@@ -4,8 +4,13 @@ obj/
 *.db-shm
 *.db-wal
 .vs/
+.git/
+.github/
 .superpowers/
+.tools/
 node_modules/
 publish/
+publish-check/
+*.log
 *.user
 SafeZone.Client/

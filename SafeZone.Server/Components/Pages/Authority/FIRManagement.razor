@@ -72,7 +72,7 @@
                                         <div class="font-medium">@fir.ComplainantName</div>
                                     </td>
                                     <td class="p-4">
-                                        <span class="badge badge-@GetStatusBadge(fir.Status)">@GetStatusLabel(fir.Status)</span>
+                                        <StatusChip Status="@fir.Status" />
                                     </td>
                                     <td class="p-4">
                                         <div class="text-sm">@FormatDate(fir.SubmittedAt)</div>
@@ -125,7 +125,7 @@
             </div>
             <div class="p-6">
                 <div class="mb-6 flex items-center gap-3">
-                    <span class="badge badge-@GetStatusBadge(selectedFir.Status)">@GetStatusLabel(selectedFir.Status)</span>
+                    <StatusChip Status="@selectedFir.Status" />
                     @if (selectedFir.Status == FIRStatus.Rejected && selectedFirDetail?.RejectionReason is not null)
                     {
                         <span class="text-sm" style="color: var(--danger);">@selectedFirDetail.RejectionReason</span>
@@ -246,7 +246,7 @@
                             }
                             <div>
                                 <p class="text-xs text-muted">Current Status</p>
-                                <span class="badge badge-@GetStatusBadge(selectedFir.Status) mt-1">@GetStatusLabel(selectedFir.Status)</span>
+                                <StatusChip Status="@selectedFir.Status" />
                             </div>
                         </div>
                     </div>

@@ -15,20 +15,20 @@ namespace SafeZone.Server.Migrations
                 name: "Alerts",
                 columns: table => new
                 {
-                    AlertId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IssuedByAuthorityId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Scope = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    RadiusKm = table.Column<double>(type: "float", nullable: true),
-                    CenterLat = table.Column<double>(type: "float", nullable: true),
-                    CenterLng = table.Column<double>(type: "float", nullable: true),
-                    TargetGeoJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IssuedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    ScheduledAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    AlertId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IssuedByAuthorityId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Title = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Message = table.Column<string>(type: "TEXT", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", nullable: false),
+                    Scope = table.Column<string>(type: "TEXT", nullable: false),
+                    RadiusKm = table.Column<double>(type: "REAL", nullable: true),
+                    CenterLat = table.Column<double>(type: "REAL", nullable: true),
+                    CenterLng = table.Column<double>(type: "REAL", nullable: true),
+                    TargetGeoJson = table.Column<string>(type: "TEXT", nullable: true),
+                    IssuedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ScheduledAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -39,11 +39,11 @@ namespace SafeZone.Server.Migrations
                 name: "IncidentCategories",
                 columns: table => new
                 {
-                    CategoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Icon = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    Color = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    Description = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true)
+                    CategoryId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    Icon = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
+                    Color = table.Column<string>(type: "TEXT", maxLength: 20, nullable: true),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -54,10 +54,10 @@ namespace SafeZone.Server.Migrations
                 name: "Roles",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    NormalizedName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    NormalizedName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -68,32 +68,34 @@ namespace SafeZone.Server.Migrations
                 name: "Users",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    FullName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Role = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PhoneHash = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    LastKnownLatitude = table.Column<double>(type: "float", nullable: true),
-                    LastKnownLongitude = table.Column<double>(type: "float", nullable: true),
-                    ProximityRadiusKm = table.Column<double>(type: "float", nullable: false),
-                    IsAnonymous = table.Column<bool>(type: "bit", nullable: false),
-                    PushNotificationsEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    LastActiveAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    NormalizedEmail = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    SecurityStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    TwoFactorEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    LockoutEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    AccessFailedCount = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    FullName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Role = table.Column<string>(type: "TEXT", nullable: false),
+                    PhoneHash = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    LastKnownLatitude = table.Column<double>(type: "REAL", nullable: true),
+                    LastKnownLongitude = table.Column<double>(type: "REAL", nullable: true),
+                    ProximityRadiusKm = table.Column<double>(type: "REAL", nullable: false),
+                    IsAnonymous = table.Column<bool>(type: "INTEGER", nullable: false),
+                    PushNotificationsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastActiveAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    RefreshToken = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true),
+                    RefreshTokenExpiry = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    UserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    NormalizedUserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Email = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    NormalizedEmail = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "INTEGER", nullable: false),
+                    PasswordHash = table.Column<string>(type: "TEXT", nullable: true),
+                    SecurityStamp = table.Column<string>(type: "TEXT", nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "TEXT", nullable: true),
+                    PhoneNumber = table.Column<string>(type: "TEXT", nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TwoFactorEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    LockoutEnd = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    LockoutEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    AccessFailedCount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -104,11 +106,11 @@ namespace SafeZone.Server.Migrations
                 name: "RoleClaims",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ClaimType = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ClaimValue = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    RoleId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
+                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -125,19 +127,19 @@ namespace SafeZone.Server.Migrations
                 name: "Authorities",
                 columns: table => new
                 {
-                    AuthId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UnitName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    BadgeNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    JurisdictionGeoJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    JurisdictionCenterLat = table.Column<double>(type: "float", nullable: false),
-                    JurisdictionCenterLng = table.Column<double>(type: "float", nullable: false),
-                    ContactInfo = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    EmergencyPhone = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    IsOnDuty = table.Column<bool>(type: "bit", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Rank = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    Department = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true)
+                    AuthId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UnitName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    BadgeNumber = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    JurisdictionGeoJson = table.Column<string>(type: "TEXT", nullable: true),
+                    JurisdictionCenterLat = table.Column<double>(type: "REAL", nullable: false),
+                    JurisdictionCenterLng = table.Column<double>(type: "REAL", nullable: false),
+                    ContactInfo = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    EmergencyPhone = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    IsOnDuty = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", nullable: false),
+                    Rank = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    Department = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -154,30 +156,30 @@ namespace SafeZone.Server.Migrations
                 name: "Incidents",
                 columns: table => new
                 {
-                    IncidentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IncidentNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    CategoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ReporterId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    Latitude = table.Column<double>(type: "float", nullable: false),
-                    Longitude = table.Column<double>(type: "float", nullable: false),
-                    Address = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Severity = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    IsAnonymous = table.Column<bool>(type: "bit", nullable: false),
-                    IsFIRFiled = table.Column<bool>(type: "bit", nullable: false),
-                    EvidenceUrls = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ReportedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IncidentDateTime = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ResolvedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    AssignedAuthorityId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    AIGeneratedSummary = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    AICallLogId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    WitnessCount = table.Column<int>(type: "int", nullable: true),
-                    SuspectDescription = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    EstimatedLoss = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
-                    SubCategory = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true)
+                    IncidentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IncidentNumber = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
+                    CategoryId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ReporterId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    Latitude = table.Column<double>(type: "REAL", nullable: false),
+                    Longitude = table.Column<double>(type: "REAL", nullable: false),
+                    Address = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    Title = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", nullable: false),
+                    Severity = table.Column<string>(type: "TEXT", nullable: false),
+                    IsAnonymous = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsFIRFiled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    EvidenceUrls = table.Column<string>(type: "TEXT", nullable: true),
+                    ReportedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    IncidentDateTime = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ResolvedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    AssignedAuthorityId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    AIGeneratedSummary = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    AICallLogId = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    WitnessCount = table.Column<int>(type: "INTEGER", nullable: true),
+                    SuspectDescription = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    EstimatedLoss = table.Column<decimal>(type: "TEXT", nullable: true),
+                    SubCategory = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -200,17 +202,17 @@ namespace SafeZone.Server.Migrations
                 name: "Notifications",
                 columns: table => new
                 {
-                    NotificationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Title = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsRead = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ReadAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    Link = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
-                    RelatedEntityId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    RelatedEntityType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true)
+                    NotificationId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    Title = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Message = table.Column<string>(type: "TEXT", nullable: false),
+                    IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ReadAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    Link = table.Column<string>(type: "TEXT", maxLength: 255, nullable: true),
+                    RelatedEntityId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    RelatedEntityType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -227,11 +229,11 @@ namespace SafeZone.Server.Migrations
                 name: "UserClaims",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ClaimType = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ClaimValue = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ClaimType = table.Column<string>(type: "TEXT", nullable: true),
+                    ClaimValue = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -248,10 +250,10 @@ namespace SafeZone.Server.Migrations
                 name: "UserLogins",
                 columns: table => new
                 {
-                    LoginProvider = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    ProviderKey = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    ProviderDisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
+                    ProviderKey = table.Column<string>(type: "TEXT", nullable: false),
+                    ProviderDisplayName = table.Column<string>(type: "TEXT", nullable: true),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -268,8 +270,8 @@ namespace SafeZone.Server.Migrations
                 name: "UserRoles",
                 columns: table => new
                 {
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    RoleId = table.Column<Guid>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -292,10 +294,10 @@ namespace SafeZone.Server.Migrations
                 name: "UserTokens",
                 columns: table => new
                 {
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LoginProvider = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Value = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    LoginProvider = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Value = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -312,21 +314,21 @@ namespace SafeZone.Server.Migrations
                 name: "AICallLogs",
                 columns: table => new
                 {
-                    LogId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IncidentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TriggeredByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CallType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    PhoneNumberCalled = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    CalledNumbers = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    TwilioCallSid = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    AIScript = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    InitiatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DurationSeconds = table.Column<int>(type: "int", nullable: false),
-                    TranscriptUrl = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
-                    SmsStatus = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    IsFalseAlarm = table.Column<bool>(type: "bit", nullable: false)
+                    LogId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IncidentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    TriggeredByUserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    CallType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    PhoneNumberCalled = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    CalledNumbers = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    TwilioCallSid = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    AIScript = table.Column<string>(type: "TEXT", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", nullable: false),
+                    InitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    CompletedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DurationSeconds = table.Column<int>(type: "INTEGER", nullable: false),
+                    TranscriptUrl = table.Column<string>(type: "TEXT", maxLength: 255, nullable: true),
+                    SmsStatus = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    IsFalseAlarm = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -343,12 +345,12 @@ namespace SafeZone.Server.Migrations
                 name: "Comments",
                 columns: table => new
                 {
-                    CommentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IncidentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsOfficialUpdate = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CommentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IncidentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Message = table.Column<string>(type: "TEXT", nullable: false),
+                    IsOfficialUpdate = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -371,38 +373,38 @@ namespace SafeZone.Server.Migrations
                 name: "FIRReports",
                 columns: table => new
                 {
-                    FIRId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    FIRNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    IncidentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ReporterId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ComplainantName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    ComplainantCNIC = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    ComplainantPhone = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    ComplainantAddress = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    ComplainantFatherName = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    ComplainantDateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    AccusedDescription = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    IncidentNarrative = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    WitnessDetails = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    PropertyLost = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    EstimatedLoss = table.Column<double>(type: "float", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    RejectionReason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    SubmittedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ReviewedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ReviewedByAuthorityId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    PDFUrl = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
-                    IncidentDateTime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IncidentPlace = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    IncidentLatitude = table.Column<double>(type: "float", nullable: false),
-                    IncidentLongitude = table.Column<double>(type: "float", nullable: false),
-                    NumberOfAccused = table.Column<int>(type: "int", nullable: false),
-                    AccusedKnown = table.Column<bool>(type: "bit", nullable: false),
-                    AccusedName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    AccusedCNIC = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    AccusedAddress = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    DigitalSignature = table.Column<byte[]>(type: "varbinary(max)", nullable: true),
-                    DeclarationAccepted = table.Column<bool>(type: "bit", nullable: false)
+                    FIRId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    FIRNumber = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
+                    IncidentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ReporterId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ComplainantName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    ComplainantCNIC = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    ComplainantPhone = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    ComplainantAddress = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    ComplainantFatherName = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    ComplainantDateOfBirth = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    AccusedDescription = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    IncidentNarrative = table.Column<string>(type: "TEXT", nullable: false),
+                    WitnessDetails = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    PropertyLost = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    EstimatedLoss = table.Column<double>(type: "REAL", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", nullable: false),
+                    RejectionReason = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    SubmittedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ReviewedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ReviewedByAuthorityId = table.Column<Guid>(type: "TEXT", nullable: true),
+                    PDFUrl = table.Column<string>(type: "TEXT", maxLength: 255, nullable: true),
+                    IncidentDateTime = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    IncidentPlace = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    IncidentLatitude = table.Column<double>(type: "REAL", nullable: false),
+                    IncidentLongitude = table.Column<double>(type: "REAL", nullable: false),
+                    NumberOfAccused = table.Column<int>(type: "INTEGER", nullable: false),
+                    AccusedKnown = table.Column<bool>(type: "INTEGER", nullable: false),
+                    AccusedName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
+                    AccusedCNIC = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
+                    AccusedAddress = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    DigitalSignature = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    DeclarationAccepted = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -419,18 +421,23 @@ namespace SafeZone.Server.Migrations
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_FIRReports_Users_ReviewedByAuthorityId",
+                        column: x => x.ReviewedByAuthorityId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
                 name: "Responses",
                 columns: table => new
                 {
-                    ResponseId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    IncidentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AuthorityId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    RespondedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    StatusUpdate = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true)
+                    ResponseId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    IncidentId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    AuthorityId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Notes = table.Column<string>(type: "TEXT", nullable: true),
+                    RespondedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    StatusUpdate = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -468,8 +475,7 @@ namespace SafeZone.Server.Migrations
                 name: "IX_AICallLogs_TwilioCallSid",
                 table: "AICallLogs",
                 column: "TwilioCallSid",
-                unique: true,
-                filter: "[TwilioCallSid] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Alerts_CenterLat_CenterLng",
@@ -553,6 +559,11 @@ namespace SafeZone.Server.Migrations
                 name: "IX_FIRReports_ReporterId",
                 table: "FIRReports",
                 column: "ReporterId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_FIRReports_ReviewedByAuthorityId",
+                table: "FIRReports",
+                column: "ReviewedByAuthorityId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_FIRReports_Status",
@@ -650,8 +661,7 @@ namespace SafeZone.Server.Migrations
                 name: "RoleNameIndex",
                 table: "Roles",
                 column: "NormalizedName",
-                unique: true,
-                filter: "[NormalizedName] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserClaims_UserId",
@@ -677,8 +687,7 @@ namespace SafeZone.Server.Migrations
                 name: "UserNameIndex",
                 table: "Users",
                 column: "NormalizedUserName",
-                unique: true,
-                filter: "[NormalizedUserName] IS NOT NULL");
+                unique: true);
         }
 
         /// <inheritdoc />

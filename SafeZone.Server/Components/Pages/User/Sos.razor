@@ -6,6 +6,7 @@
 @inject ISosService SosService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ToastService ToastSvc
+@inject IJSRuntime JS
 
 <PageTitle>SOS Emergency - SafeZone</PageTitle>
 
@@ -31,7 +32,7 @@
             {
                 <div class="emergency-card @(selectedEmergencyType == i ? "selected" : "")"
                      @onclick="() => SelectEmergencyType(i)">
-                    <div class="emoji">@EmergencyTypeEmojis[i]</div>
+                    <div class="emoji">@IconMarkup(EmergencyTypeEmojis[i])</div>
                     <p class="name">@EmergencyTypeNames[i]</p>
                     <p class="number">Dial @EmergencyNumbers[i]</p>
                 </div>
@@ -92,18 +93,13 @@
                 <div class="sos-log-item">
                     <div class="sos-log-header">
                         <div class="sos-log-meta">
-                            <span class="sos-log-emoji">@GetEmergencyEmoji(log.CallType)</span>
+                            <span class="sos-log-emoji">@IconMarkup(GetEmergencyEmoji(log.CallType))</span>
                             <div class="sos-log-info">
                                 <p>@log.CallType Emergency</p>
                                 <span>@log.InitiatedAt.ToString("g")</span>
                             </div>
                         </div>
-                        @{
-                            var isCompleted = log.Status == CallStatus.Completed;
-                            var badgeClass = isCompleted ? "badge badge-primary" : "badge badge-info";
-                            var badgeText = isCompleted ? "Completed" : log.Status.ToString();
-                        }
-                        <span class="@badgeClass">@badgeText</span>
+                        <StatusChip Status="@log.Status" />
                     </div>
                     @if (log.IsFalseAlarm)
                     {
@@ -142,7 +138,7 @@
             <div class="sos-ring"></div>
             <div class="sos-ring"></div>
             <div class="sos-ring"></div>
-            <div class="sos-calling-icon">@callingIcon</div>
+            <div class="sos-calling-icon">@IconMarkup(callingIcon)</div>
         </div>
         <h3 class="sos-calling-title">@callingTitle</h3>
         <p class="sos-calling-status">@callingStatus</p>
@@ -155,7 +151,16 @@
                 var isCompletedStep = completedSteps[i];
                 var stepClass = isActiveStep ? "active" : isCompletedStep ? "completed" : "";
                 <div class="sos-call-step @stepClass">
-                    <div class="sos-step-icon">@(isCompletedStep ? "&#x2713;" : stepNum.ToString())</div>
+                    <div class="sos-step-icon">
+                        @if (isCompletedStep)
+                        {
+                            <text>&#x2713;</text>
+                        }
+                        else
+                        {
+                            @stepNum
+                        }
+                    </div>
                     <div>
                         <p class="sos-step-title">@CallStepTitles[i]</p>
                         <p class="sos-step-sub">@CallStepSubtitles[i]</p>
@@ -179,7 +184,7 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <p class="text-xs" style="color: var(--text-3); margin-bottom: 4px;">Emergency Type</p>
-                        <p class="font-medium text-sm">@resultEmergencyTypeDisplay</p>
+                        <p class="font-medium text-sm">@IconMarkup(resultEmergencyTypeDisplay)</p>
                     </div>
                     <div>
                         <p class="text-xs" style="color: var(--text-3); margin-bottom: 4px;">Call Duration</p>
@@ -256,6 +261,18 @@
         }
         userId = id;
         await LoadRecentLogs();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("safezoneMap.init", "sos-map", new { zoomControl = false, scrollWheelZoom = false });
+            }
+            catch { /* ignore for prerendering */ }
+        }
     }
 
     private void SelectEmergencyType(int type)
@@ -397,6 +414,18 @@
         Navigation.NavigateTo("/user/my-incidents");
     }
 
+    private static string GetStatusLabel(CallStatus s) => s switch
+    {
+        CallStatus.Initiated => "Initiated",
+        CallStatus.Ringing => "Ringing",
+        CallStatus.Answered => "Answered",
+        CallStatus.Completed => "Completed",
+        CallStatus.Failed => "Failed",
+        CallStatus.NoAnswer => "No Answer",
+        CallStatus.Cancelled => "Cancelled",
+        _ => s.ToString()
+    };
+
     private string GetEmergencyEmoji(string callType)
     {
         return callType?.ToLower() switch
@@ -408,6 +437,8 @@
             _ => "&#x1F6A8;"
         };
     }
+
+    private static MarkupString IconMarkup(string value) => (MarkupString)value;
 
     private async Task LoadRecentLogs()
     {
@@ -440,5 +471,13 @@
     {
         cts?.Cancel();
         cts?.Dispose();
+        try
+        {
+            _ = JS.InvokeVoidAsync("safezoneMap.dispose", "sos-map");
+        }
+        catch
+        {
+            // Circuit may already be gone during navigation
+        }
     }
 }

@@ -11,10 +11,12 @@ namespace SafeZone.Server.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _logger = logger;
     }
 
     /// <summary>Register a new user account with phone number and password.</summary>
@@ -24,20 +26,38 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
+            var errors = ModelState
+                .Where(kvp => kvp.Value?.Errors.Count > 0)
+                .SelectMany(kvp => kvp.Value!.Errors.Select(error => $"{kvp.Key}: {error.ErrorMessage}"));
+
             return BadRequest(new AuthResponseDto
             {
                 Success = false,
-                Message = "Invalid registration data."
+                Message = $"Invalid registration data. {string.Join(" ", errors)}"
             });
         }
 
-        var result = await _authService.RegisterAsync(dto);
-        if (!result.Success)
+        try
         {
-            return BadRequest(result);
-        }
+            var result = await _authService.RegisterAsync(dto);
+            if (!result.Success)
+            {
+                _logger.LogWarning("Registration failed for {Phone}: {Message}", dto.PhoneNumber, result.Message);
+                return BadRequest(result);
+            }
 
-        return Ok(result);
+            _logger.LogInformation("Registration succeeded for {Phone}. TokenIssued={TokenIssued}", dto.PhoneNumber, !string.IsNullOrWhiteSpace(result.Token));
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled API registration error for {Phone}.", dto.PhoneNumber);
+            return StatusCode(500, new AuthResponseDto
+            {
+                Success = false,
+                Message = "Registration failed because of a server error. Please try again."
+            });
+        }
     }
 
     [HttpPost("login")]

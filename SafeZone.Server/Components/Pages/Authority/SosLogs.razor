@@ -58,7 +58,7 @@
                                 </td>
                                 <td class="px-6 py-4 text-white font-medium">@log.PhoneNumberCalled</td>
                                 <td class="px-6 py-4">
-                                    <span class='badge badge-@GetStatusBadge(log.Status)'>@log.Status</span>
+                                    <StatusChip Status="@log.Status" />
                                 </td>
                                 <td class="px-6 py-4 text-muted text-sm">@FormatDate(log.InitiatedAt)</td>
                                 <td class="px-6 py-4 text-muted text-sm">@FormatDuration(log.DurationSeconds)</td>
@@ -99,7 +99,7 @@
 
                     <div>
                         <p class="text-muted text-xs uppercase tracking-wider">Status</p>
-                        <span class='badge badge-@GetStatusBadge(selectedLog.Status)'>@selectedLog.Status</span>
+                        <StatusChip Status="@selectedLog.Status" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -173,6 +173,18 @@
         }
     }
 
+    private string GetStatusLabel(CallStatus s) => s switch
+    {
+        CallStatus.Initiated => "Initiated",
+        CallStatus.Ringing => "Ringing",
+        CallStatus.Answered => "Answered",
+        CallStatus.Completed => "Completed",
+        CallStatus.Failed => "Failed",
+        CallStatus.NoAnswer => "No Answer",
+        CallStatus.Cancelled => "Cancelled",
+        _ => s.ToString()
+    };
+
     private string GetStatusBadge(CallStatus s) => s switch
     {
         CallStatus.Initiated => "warning",
@@ -194,7 +206,7 @@
         _ => "📞"
     };
 
-    private async Task OpenDetail(SosCallLogDto log)
+    private void OpenDetail(SosCallLogDto log)
     {
         selectedLog = log;
         showDetail = true;

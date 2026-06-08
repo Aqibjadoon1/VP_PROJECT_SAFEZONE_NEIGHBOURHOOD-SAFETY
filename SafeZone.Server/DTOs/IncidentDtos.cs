@@ -68,9 +68,9 @@ public record IncidentResponseDto
 
     public string CategoryName { get; init; } = string.Empty;
 
-    public string CategoryIcon { get; init; } = string.Empty;
+    public string? CategoryIcon { get; init; }
 
-    public string CategoryColor { get; init; } = string.Empty;
+    public string? CategoryColor { get; init; }
 
     public Guid? ReporterId { get; init; }
 
@@ -117,7 +117,7 @@ public record IncidentResponseDto
 
     public string CategoryName { get; init; } = string.Empty;
 
-    public string CategoryIcon { get; init; } = string.Empty;
+    public string? CategoryIcon { get; init; }
 
     public string Title { get; init; } = string.Empty;
 
@@ -152,9 +152,9 @@ public record MapIncidentDto
 
     public string CategoryName { get; init; } = string.Empty;
 
-    public string CategoryIcon { get; init; } = string.Empty;
+    public string? CategoryIcon { get; init; }
 
-    public string CategoryColor { get; init; } = string.Empty;
+    public string? CategoryColor { get; init; }
 
     public IncidentStatus Status { get; init; }
 
@@ -180,9 +180,9 @@ public record CategoryDto
 
     public string Name { get; init; } = string.Empty;
 
-    public string Icon { get; init; } = string.Empty;
+    public string? Icon { get; init; }
 
-    public string Color { get; init; } = string.Empty;
+    public string? Color { get; init; }
 
-    public string Description { get; init; } = string.Empty;
+    public string? Description { get; init; }
 }

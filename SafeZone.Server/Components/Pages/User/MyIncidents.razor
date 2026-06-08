@@ -82,7 +82,11 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="font-display text-xl font-bold">@selectedIncident.Title</h3>
-                            <p class="text-sm text-muted mt-1">@selectedIncident.IncidentNumber • @GetStatusLabel(selectedIncident.Status) • @GetSeverityIcon(selectedIncident.Severity) @GetSeverityLabel(selectedIncident.Severity)</p>
+                            <div class="text-sm text-muted mt-1 flex items-center gap-2 flex-wrap">
+                                <span>@selectedIncident.IncidentNumber</span>
+                                <StatusChip Status="@selectedIncident.Status" />
+                                <span>@GetSeverityIcon(selectedIncident.Severity) @GetSeverityLabel(selectedIncident.Severity)</span>
+                            </div>
                         </div>
                         <button class="btn btn-secondary btn-icon" @onclick="CloseModal">✕</button>
                     </div>
@@ -95,7 +99,7 @@
                         </div>
                         <div class="p-4 rounded-lg" style="background: var(--glass);">
                             <p class="text-xs text-muted mb-1">Status</p>
-                            <p class="font-medium">@GetStatusLabel(selectedIncident.Status)</p>
+                            <StatusChip Status="@selectedIncident.Status" />
                         </div>
                         <div class="p-4 rounded-lg" style="background: var(--glass);">
                             <p class="text-xs text-muted mb-1">Reported</p>

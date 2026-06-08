@@ -5,15 +5,16 @@ using SafeZone.Server.Models;
 
 namespace SafeZone.Server.Services;
 
-  public class SosService : ISosService
+public class SosService : ISosService
 {
     private readonly SafeZoneDbContext _context;
     private readonly IConfiguration _config;
     private readonly IVoiceCallService _voiceCallService;
     private readonly IGmailNotificationService? _gmail;
     private readonly ISlackNotificationService? _slack;
+    private readonly ILogger<SosService>? _logger;
 
-     public bool IsMockMode {
+    public bool IsMockMode {
         get {
             var mockMode = _config["Twilio:UseMockMode"];
             if (string.IsNullOrEmpty(mockMode)) return true;
@@ -38,20 +39,22 @@ namespace SafeZone.Server.Services;
     };
 
     public SosService(
-        SafeZoneDbContext context, 
+        SafeZoneDbContext context,
         IConfiguration config,
         IVoiceCallService voiceCallService,
         IGmailNotificationService? gmail = null,
-        ISlackNotificationService? slack = null)
+        ISlackNotificationService? slack = null,
+        ILogger<SosService>? logger = null)
     {
         _context = context;
         _config = config;
         _voiceCallService = voiceCallService;
         _gmail = gmail;
         _slack = slack;
+        _logger = logger;
     }
 
-     public async Task<SosResponseDto> TriggerEmergencyAsync(TriggerSosDto dto, Guid userId)
+    public async Task<SosResponseDto> TriggerEmergencyAsync(TriggerSosDto dto, Guid userId)
     {
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
@@ -73,15 +76,17 @@ namespace SafeZone.Server.Services;
 
         var category = await _context.IncidentCategories
             .FirstOrDefaultAsync(c => c.Name == "Assault" || c.Name == "Other")
-            ?? await _context.IncidentCategories.FirstAsync();
+            ?? await _context.IncidentCategories.FirstOrDefaultAsync();
 
-        var incidentNumber = $"INC-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(1000, 9999)}";
+        var categoryId = category?.CategoryId ?? Guid.Empty;
+
+        var incidentNumber = $"INC-{DateTime.UtcNow:yyyyMMdd}-{DateTime.UtcNow:HHmmss}-{Random.Shared.Next(1000, 9999)}";
 
         var incident = new Incident
         {
             IncidentId = Guid.NewGuid(),
             IncidentNumber = incidentNumber,
-            CategoryId = category.CategoryId,
+            CategoryId = categoryId,
             Title = $"SOS: {emergencyName} Emergency",
             Description = aiScript,
             Severity = SeverityLevel.Critical,
@@ -109,42 +114,101 @@ namespace SafeZone.Server.Services;
             Status = CallStatus.Completed,
             InitiatedAt = DateTime.UtcNow,
             CompletedAt = DateTime.UtcNow,
-            DurationSeconds = new Random().Next(30, 120),
+            DurationSeconds = Random.Shared.Next(30, 120),
             IsFalseAlarm = false,
             SmsStatus = "sent_mock"
         };
 
-         _context.AICallLogs.Add(callLog);
+        _context.AICallLogs.Add(callLog);
         await _context.SaveChangesAsync();
 
-        if (_gmail != null && user.PhoneNumber != null)
+        if (_gmail != null)
         {
-            _ = _gmail.SendIncidentAlertAsync(user.PhoneNumber, $"SOS: {emergencyName}", "Critical");
+            var recipientEmail = user.Email ?? user.UserName;
+            if (!string.IsNullOrWhiteSpace(recipientEmail))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var sent = await _gmail.SendIncidentAlertAsync(recipientEmail, $"SOS: {emergencyName}", "Critical");
+                        if (!sent)
+                        {
+                            _logger?.LogWarning("[SOS Notification] Gmail alert was not sent to {Email}. Check Gmail API configuration.", recipientEmail);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to send Gmail SOS alert to {Email}.", recipientEmail);
+                    }
+                });
+            }
+            else
+            {
+                _logger?.LogWarning("[SOS Notification] Cannot send email: user {UserId} has no email address.", userId);
+            }
         }
 
         if (_slack != null)
         {
-            _ = _slack.SendAlertAsync(
-                $"SOS EMERGENCY: {emergencyName}",
-                $"SOS triggered by {user.FullName} ({user.PhoneNumber}). Location: ({dto.Latitude:F4}, {dto.Longitude:F4}). AI Script: {aiScript[..Math.Min(aiScript.Length, 200)]}",
-                "Critical");
-        }
-
-        if (IsMockMode)
-        {
-            var emergencyPrompt = GenerateEmergencyPrompt(dto.EmergencyType, dto.Latitude, dto.Longitude, emergencyName);
-            
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    var callSession = await _voiceCallService.StartOutboundCallAsync(
+                    await _slack.SendAlertAsync(
+                        $"SOS EMERGENCY: {emergencyName}",
+                        $"SOS triggered by {user.FullName} ({user.PhoneNumber}). Location: ({dto.Latitude:F4}, {dto.Longitude:F4}). AI Script: {aiScript[..Math.Min(aiScript.Length, 200)]}",
+                        "Critical");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to send Slack SOS alert.");
+                }
+            });
+        }
+
+        // Notify all superadmins
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var superAdmins = await _context.Users
+                    .Where(u => u.Role == UserRole.SuperAdmin && u.IsActive)
+                    .ToListAsync();
+
+                foreach (var admin in superAdmins)
+                {
+                    var adminEmail = admin.Email ?? admin.UserName;
+                    if (!string.IsNullOrWhiteSpace(adminEmail) && _gmail != null)
+                    {
+                        await _gmail.SendEmailAsync(adminEmail,
+                            $"[CRITICAL] SOS Emergency: {emergencyName}",
+                            $"An SOS emergency has been triggered.\n\nType: {emergencyName}\nTriggered by: {user.FullName} ({user.PhoneNumber})\nLocation: {dto.Latitude:F6}, {dto.Longitude:F6}\nTime: {DateTime.UtcNow:MMM dd, yyyy HH:mm:ss UTC}\n\nView at: http://localhost:5000/authority/sos-logs");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to send superadmin SOS notifications.");
+            }
+        });
+
+        if (IsMockMode)
+        {
+            var emergencyPrompt = GenerateEmergencyPrompt(dto.EmergencyType, dto.Latitude, dto.Longitude, emergencyName);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _voiceCallService.StartOutboundCallAsync(
                         emergencyNumber,
                         emergencyPrompt,
                         userId);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger?.LogError(ex, "Voice call failed for SOS emergency.");
                 }
             });
         }
@@ -162,10 +226,12 @@ namespace SafeZone.Server.Services;
         };
     }
 
-     public async Task<List<SosCallLogDto>> GetMyCallLogsAsync(Guid userId)
+    public async Task<List<SosCallLogDto>> GetMyCallLogsAsync(Guid userId)
     {
         return await _context.AICallLogs
+            .AsNoTracking()
             .Include(c => c.Incident)
+            .ThenInclude(i => i!.Reporter)
             .Where(c => c.TriggeredByUserId == userId)
             .OrderByDescending(c => c.InitiatedAt)
             .Select(c => new SosCallLogDto
@@ -183,18 +249,20 @@ namespace SafeZone.Server.Services;
                 IncidentLatitude = c.Incident != null ? c.Incident.Latitude : 0,
                 IncidentLongitude = c.Incident != null ? c.Incident.Longitude : 0,
                 IncidentTitle = c.Incident != null ? c.Incident.Title : null,
-                TriggeredByUserName = c.Incident != null && c.Incident.Reporter != null 
-                    ? c.Incident.Reporter.FullName 
-                    : null
+                TriggeredByUserName = c.Incident != null && c.Incident.Reporter != null
+                    ? c.Incident.Reporter.FullName
+                    : null,
+                UserId = c.TriggeredByUserId
             })
             .ToListAsync();
     }
 
-     public async Task<List<SosCallLogDto>> GetAllCallLogsAsync(CallStatus? status = null)
+    public async Task<List<SosCallLogDto>> GetAllCallLogsAsync(CallStatus? status = null)
     {
         var query = _context.AICallLogs
+            .AsNoTracking()
             .Include(c => c.Incident)
-            .ThenInclude(i => i.Reporter)
+            .ThenInclude(i => i!.Reporter)
             .AsQueryable();
 
         if (status.HasValue)
@@ -219,9 +287,10 @@ namespace SafeZone.Server.Services;
                 IncidentLatitude = c.Incident != null ? c.Incident.Latitude : 0,
                 IncidentLongitude = c.Incident != null ? c.Incident.Longitude : 0,
                 IncidentTitle = c.Incident != null ? c.Incident.Title : null,
-                TriggeredByUserName = c.Incident != null && c.Incident.Reporter != null 
-                    ? c.Incident.Reporter.FullName 
-                    : null
+                TriggeredByUserName = c.Incident != null && c.Incident.Reporter != null
+                    ? c.Incident.Reporter.FullName
+                    : null,
+                UserId = c.TriggeredByUserId
             })
             .ToListAsync();
     }
@@ -239,11 +308,12 @@ namespace SafeZone.Server.Services;
         return await GetCallLogByIdAsync(logId);
     }
 
-     public async Task<SosCallLogDto?> GetCallLogByIdAsync(Guid logId)
+    public async Task<SosCallLogDto?> GetCallLogByIdAsync(Guid logId)
     {
         var log = await _context.AICallLogs
+            .AsNoTracking()
             .Include(c => c.Incident)
-            .ThenInclude(i => i.Reporter)
+            .ThenInclude(i => i!.Reporter)
             .FirstOrDefaultAsync(c => c.LogId == logId);
 
         if (log == null) return null;
@@ -263,10 +333,11 @@ namespace SafeZone.Server.Services;
             IncidentLatitude = log.Incident != null ? log.Incident.Latitude : 0,
             IncidentLongitude = log.Incident != null ? log.Incident.Longitude : 0,
             IncidentTitle = log.Incident != null ? log.Incident.Title : null,
-            TriggeredByUserName = log.Incident != null && log.Incident.Reporter != null 
-                ? log.Incident.Reporter.FullName 
-                : null
-         };
+            TriggeredByUserName = log.Incident != null && log.Incident.Reporter != null
+                ? log.Incident.Reporter.FullName
+                : null,
+            UserId = log.TriggeredByUserId
+        };
     }
 
     private string GenerateEmergencyPrompt(
@@ -291,7 +362,7 @@ namespace SafeZone.Server.Services;
     {
         var emergencyName = EmergencyNames.GetValueOrDefault(emergencyType, "Emergency");
         var now = DateTime.UtcNow;
-        var localTime = now.AddHours(5);
+        var localTime = GetPakistanTime(now);
 
         var scriptLines = new List<string>
         {
@@ -374,5 +445,18 @@ namespace SafeZone.Server.Services;
         scriptLines.Add($"(Generated by SafeZone AI Emergency Agent at {now:HH:mm:ss})");
 
         return string.Join(Environment.NewLine, scriptLines);
+    }
+
+    private static DateTime GetPakistanTime(DateTime utcTime)
+    {
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Karachi");
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return utcTime.AddHours(5);
+        }
     }
 }

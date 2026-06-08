@@ -26,8 +26,11 @@ public class FirController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<FirResponseDto>> CreateFir(CreateFirDto dto)
+    public async Task<ActionResult<FirResponseDto>> CreateFir([FromBody] CreateFirDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 
@@ -42,9 +45,9 @@ public class FirController : ControllerBase
         if (fir == null) return NotFound(new { message = "FIR not found" });
 
         var userId = GetCurrentUserId();
-        var userRole = User.FindFirstValue(ClaimTypes.Role);
+        var isAuthority = User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
 
-        if (userRole != "Authority" && userRole != "SuperAdmin")
+        if (!isAuthority)
         {
             if (fir.ReporterId != userId)
             {
@@ -72,6 +75,8 @@ public class FirController : ControllerBase
         FIRStatus? statusEnum = null;
         if (status.HasValue)
         {
+            if (!Enum.IsDefined(typeof(FIRStatus), status.Value))
+                return BadRequest(new { message = "Invalid status value." });
             statusEnum = (FIRStatus)status.Value;
         }
 
@@ -81,8 +86,11 @@ public class FirController : ControllerBase
 
     [HttpPut("{id}/review")]
     [Authorize(Roles = "Authority,SuperAdmin")]
-    public async Task<ActionResult<FirResponseDto>> ReviewFir(Guid id, ReviewFirDto dto)
+    public async Task<ActionResult<FirResponseDto>> ReviewFir(Guid id, [FromBody] ReviewFirDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 

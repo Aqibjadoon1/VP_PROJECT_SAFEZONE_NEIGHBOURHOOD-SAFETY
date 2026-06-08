@@ -6,11 +6,13 @@ namespace SafeZone.Server.DTOs;
 public class RegisterDto
 {
     [Required]
-    [Phone]
     public string PhoneNumber { get; set; } = string.Empty;
 
+    [EmailAddress]
+    public string? Email { get; set; }
+
     [Required]
-    [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
+    [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
     public string Password { get; set; } = string.Empty;
 
     [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]

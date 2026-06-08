@@ -28,8 +28,13 @@ public class FileUploadController : ControllerBase
         if (!allowedExtensions.Contains(ext))
             return BadRequest(new { success = false, message = $"File type '{ext}' is not allowed." });
 
+        // Sanitize filename to prevent path traversal
+        var safeFileName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            return BadRequest(new { success = false, message = "Invalid file name." });
+
         await using var stream = file.OpenReadStream();
-        var blobId = await _blobStorage.UploadAsync(file.FileName, stream, file.ContentType);
+        var blobId = await _blobStorage.UploadAsync(safeFileName, stream, file.ContentType);
 
         return Ok(new
         {

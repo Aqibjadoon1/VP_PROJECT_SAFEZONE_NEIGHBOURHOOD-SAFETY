@@ -243,25 +243,42 @@ body::after {
     opacity: 0.5;
 }
 
+.glass-elevated.glow-green {
+    --accent-color: var(--neon-green);
+    --accent-glow: var(--neon-green-glow);
+}
 .glass-elevated.glow-green::before {
     background: linear-gradient(135deg, var(--neon-green), var(--electric-cyan));
 }
 
+.glass-elevated.glow-red {
+    --accent-color: var(--alert-red);
+    --accent-glow: var(--alert-red-glow);
+}
 .glass-elevated.glow-red::before {
     background: linear-gradient(135deg, var(--alert-red), var(--warning-amber));
 }
 
+.glass-elevated.glow-purple {
+    --accent-color: var(--command-purple);
+    --accent-glow: var(--command-purple-glow);
+}
 .glass-elevated.glow-purple::before {
     background: linear-gradient(135deg, var(--command-purple), var(--electric-cyan));
 }
 
+.glass-elevated.glow-amber {
+    --accent-color: var(--warning-amber);
+    --accent-glow: var(--warning-amber-glow);
+}
 .glass-elevated.glow-amber::before {
     background: linear-gradient(135deg, var(--warning-amber), var(--neon-green));
 }
 
 .glass-elevated:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(0,255,136,0.1);
+    border-color: var(--accent-color, var(--glass-border-strong));
+    box-shadow: 0 8px 32px var(--accent-glow, rgba(0,255,136,0.1));
 }
 
 /* 4. Custom scrollbar */
@@ -771,6 +788,84 @@ table tbody tr:hover {
     position: relative;
     width: 100%;
     height: 500px;
+    min-height: 420px;
+    isolation: isolate;
+}
+
+.hero-section {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-canvas {
+    position: absolute;
+    inset: -24px;
+    width: calc(100% + 48px);
+    height: calc(100% + 48px);
+    min-height: 420px;
+    pointer-events: none;
+}
+
+.hero-canvas canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    filter: drop-shadow(0 0 24px rgba(0, 255, 136, 0.22)) saturate(1.15);
+}
+
+.hero-model-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 12%;
+    z-index: -1;
+    border: 1px solid rgba(0, 212, 255, 0.12);
+    border-radius: 50%;
+    transform: rotateX(68deg);
+    box-shadow:
+        0 0 40px rgba(0, 255, 136, 0.10),
+        inset 0 0 32px rgba(0, 212, 255, 0.08);
+}
+
+.hero-stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-1);
+}
+
+@media (max-width: 1023px) {
+    .hero-model-wrap {
+        height: 360px;
+        min-height: 320px;
+    }
+
+    .hero-canvas {
+        inset: -16px;
+        width: calc(100% + 32px);
+        height: calc(100% + 32px);
+        min-height: 320px;
+    }
+}
+
+@media (max-width: 640px) {
+    .hero-model-wrap {
+        height: 300px;
+        min-height: 280px;
+    }
+
+    .hero-stats {
+        gap: 16px;
+    }
+
+    .hero-stat-value {
+        font-size: 1.1rem;
+    }
 }
 
 .flex { display: flex; }
@@ -1013,13 +1108,19 @@ table tbody tr:hover {
     overflow: hidden;
 }
 
+.glass-card {
+    --accent-color: var(--electric-cyan);
+    --accent-glow: var(--electric-cyan-glow);
+    --accent-dim: var(--electric-cyan-dim);
+}
+
 .glass-card::before {
     content: '';
     position: absolute;
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, var(--electric-cyan), var(--command-purple), var(--electric-cyan));
+    background: linear-gradient(135deg, var(--accent-color), var(--command-purple), var(--accent-color));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -1034,9 +1135,16 @@ table tbody tr:hover {
 
 .glass-card:hover {
     transform: translateY(-2px);
-    border-color: var(--glass-border-strong);
+    border-color: var(--accent-color);
     background: var(--bg-elevated);
+    box-shadow: 0 8px 32px var(--accent-glow);
 }
+
+.glass-card.accent-primary { --accent-color: var(--neon-green); --accent-dim: var(--neon-green-dim); --accent-glow: var(--neon-green-glow); }
+.glass-card.accent-danger { --accent-color: var(--alert-red); --accent-dim: var(--alert-red-dim); --accent-glow: var(--alert-red-glow); }
+.glass-card.accent-warning { --accent-color: var(--warning-amber); --accent-dim: var(--warning-amber-dim); --accent-glow: var(--warning-amber-glow); }
+.glass-card.accent-info { --accent-color: var(--electric-cyan); --accent-dim: var(--electric-cyan-dim); --accent-glow: var(--electric-cyan-glow); }
+.glass-card.accent-purple { --accent-color: var(--command-purple); --accent-dim: var(--command-purple-dim); --accent-glow: var(--command-purple-glow); }
 
 .glass-card-header {
     display: flex;
@@ -1196,6 +1304,96 @@ table tbody tr:hover {
 
 .status-chip.closed { background: rgba(255,255,255,0.06); color: var(--text-3); }
 .status-chip.closed .dot { background: var(--text-3); }
+
+.status-chip.active {
+    background: rgba(0, 255, 136, 0.12);
+    color: var(--neon-green);
+    border: 1px solid rgba(0, 255, 136, 0.28);
+}
+.status-chip.active .dot { background: var(--neon-green); box-shadow: 0 0 10px rgba(0, 255, 136, 0.8); }
+
+.status-chip.offline {
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--text-3);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+.status-chip.offline .dot { background: var(--text-3); }
+
+.status-chip.warning {
+    background: rgba(255, 184, 0, 0.14);
+    color: var(--warning-amber);
+    border: 1px solid rgba(255, 184, 0, 0.3);
+}
+.status-chip.warning .dot { background: var(--warning-amber); box-shadow: 0 0 10px rgba(255, 184, 0, 0.75); }
+
+.status-chip.critical {
+    background: rgba(255, 51, 102, 0.14);
+    color: var(--danger);
+    border: 1px solid rgba(255, 51, 102, 0.34);
+}
+.status-chip.critical .dot { background: var(--danger); box-shadow: 0 0 10px rgba(255, 51, 102, 0.8); }
+
+.status-chip.suspended {
+    background: rgba(168, 85, 247, 0.13);
+    color: var(--command-purple);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+.status-chip.suspended .dot { background: var(--command-purple); }
+
+.status-chip.unknown {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-3);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.status-chip.unknown .dot { background: var(--text-3); }
+
+.ee-logo {
+    display: block;
+    flex: 0 0 auto;
+    overflow: visible;
+    filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.28));
+    transition: filter 220ms ease, transform 220ms ease;
+}
+
+.safezone-logo .safezone-logo-shield {
+    transform-origin: center;
+    transition: stroke-width 220ms ease, transform 220ms ease;
+}
+
+.safezone-logo .safezone-logo-helix {
+    transform-origin: center;
+    transition: filter 220ms ease, opacity 220ms ease;
+}
+
+.safezone-logo .safezone-logo-rungs {
+    opacity: 0.78;
+    transition: opacity 220ms ease;
+}
+
+a:hover .safezone-logo,
+button:hover .safezone-logo,
+.safezone-logo:hover {
+    transform: translateY(-1px) scale(1.04);
+    filter:
+        drop-shadow(0 0 9px rgba(0, 255, 136, 0.62))
+        drop-shadow(0 0 18px rgba(0, 212, 255, 0.35));
+}
+
+a:hover .safezone-logo .safezone-logo-shield,
+.safezone-logo:hover .safezone-logo-shield {
+    transform: scale(1.015);
+    stroke-width: 3;
+}
+
+a:hover .safezone-logo .safezone-logo-helix,
+.safezone-logo:hover .safezone-logo-helix {
+    filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.8));
+}
+
+a:hover .safezone-logo .safezone-logo-rungs,
+.safezone-logo:hover .safezone-logo-rungs {
+    opacity: 1;
+}
 
 /* ============================================
    Tactical Incident Cards
@@ -3668,10 +3866,14 @@ elevenlabs-convai {
 }
 
 .command-alert-card:hover {
-    border-color: var(--glass-border-strong);
+    border-color: var(--accent-color, var(--glass-border-strong));
     transform: translateX(2px);
 }
 
+.command-alert-card.danger { --accent-color: var(--alert-red); }
+.command-alert-card.warning { --accent-color: var(--warning-amber); }
+.command-alert-card.info { --accent-color: var(--electric-cyan); }
+.command-alert-card.purple { --accent-color: var(--command-purple); }
 .command-alert-card.danger::before { background: var(--alert-red); }
 .command-alert-card.warning::before { background: var(--warning-amber); }
 .command-alert-card.info::before { background: var(--electric-cyan); }
@@ -3795,8 +3997,8 @@ elevenlabs-convai {
 
 .kanban-card:hover {
     transform: translateY(-2px);
-    border-color: var(--glass-border-strong);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border-color: var(--severity-color, var(--glass-border-strong));
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 0 12px var(--severity-color, transparent);
 }
 
 .kanban-card .card-title {
@@ -3920,6 +4122,9 @@ elevenlabs-convai {
     position: relative;
     overflow: hidden;
     transition: all 300ms ease;
+    --accent-color: var(--electric-cyan);
+    --accent-glow: var(--electric-cyan-glow);
+    --accent-dim: var(--electric-cyan-dim);
 }
 
 .action-card::before {
@@ -3928,7 +4133,7 @@ elevenlabs-convai {
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, var(--electric-cyan), var(--command-purple), var(--electric-cyan));
+    background: linear-gradient(135deg, var(--accent-color), var(--command-purple), var(--accent-color));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -3940,6 +4145,832 @@ elevenlabs-convai {
 .action-card:hover::before {
     opacity: 0.5;
 }
+
+.action-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 8px 32px var(--accent-glow);
+}
+
+.action-card.accent-primary { --accent-color: var(--neon-green); --accent-dim: var(--neon-green-dim); --accent-glow: var(--neon-green-glow); }
+.action-card.accent-danger { --accent-color: var(--alert-red); --accent-dim: var(--alert-red-dim); --accent-glow: var(--alert-red-glow); }
+.action-card.accent-warning { --accent-color: var(--warning-amber); --accent-dim: var(--warning-amber-dim); --accent-glow: var(--warning-amber-glow); }
+.action-card.accent-info { --accent-color: var(--electric-cyan); --accent-dim: var(--electric-cyan-dim); --accent-glow: var(--electric-cyan-glow); }
+.action-card.accent-purple { --accent-color: var(--command-purple); --accent-dim: var(--command-purple-dim); --accent-glow: var(--command-purple-glow); }
+
+/* ============================================
+   Cyberpunk Card Hover System
+   Each card type → unique hover identity
+   Uses GPU-accelerated transforms & opacity
+   ============================================ */
+
+:root {
+    --scan-speed: 1.8s;
+    --pulse-speed: 1.5s;
+    --sweep-speed: 1.2s;
+    --flicker-speed: 0.12s;
+}
+
+/* ── 1. METRIC CARD — "Neon Pulse" ──
+   Animated ring glow + value text shadow pulse + icon surge */
+@keyframes neon-ring-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.04); opacity: 0.08; }
+}
+
+.metric-card::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    border: 1px solid var(--accent-color, var(--neon-green));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.metric-card:hover::after {
+    opacity: 0.3;
+    animation: neon-ring-pulse var(--pulse-speed) ease-in-out infinite;
+}
+
+.metric-card:hover .metric-value {
+    text-shadow: 0 0 20px var(--accent-glow, var(--neon-green-glow));
+    transition: text-shadow 0.3s ease;
+}
+
+.metric-card:hover .metric-icon {
+    transform: scale(1.18);
+    box-shadow: 0 0 30px var(--accent-glow, var(--neon-green-glow));
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+/* ── 2. ACTION CARD — "Holo Lift" ──
+   3D perspective rotation + icon levitation + holographic scan line */
+@keyframes action-holoscan {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.action-card {
+    perspective: 500px;
+}
+
+.action-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-color, var(--electric-cyan)), transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.action-card:hover {
+    transform: translateY(-6px) perspective(500px) rotateX(3deg) scale(1.02);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.action-card:hover::after {
+    opacity: 0.7;
+    animation: action-holoscan var(--scan-speed) linear infinite;
+}
+
+.action-card:hover .action-icon {
+    transform: scale(1.3);
+    box-shadow: 0 0 28px var(--accent-glow, var(--electric-cyan-glow));
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.action-card:hover .action-label {
+    text-shadow: 0 0 12px var(--accent-color, var(--electric-cyan));
+}
+
+/* ── 3. GLASS CARD — "Grid Projection" ──
+   Digital grid overlay fade-in + cyan corner brackets + depth lift */
+@keyframes grid-fade {
+    0%, 100% { opacity: 0; }
+    40%, 60% { opacity: 0.12; }
+}
+
+.glass-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(90deg, transparent 49.8%, rgba(0,212,255,0.08) 50%, transparent 50.2%),
+        linear-gradient(0deg, transparent 49.8%, rgba(0,212,255,0.08) 50%, transparent 50.2%);
+    background-size: 24px 24px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.4s ease;
+    border-radius: inherit;
+}
+
+.glass-card:hover::after {
+    opacity: 1;
+    animation: grid-fade 3s ease-in-out infinite;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.35), 0 0 32px var(--accent-glow, var(--electric-cyan-glow));
+}
+
+/* ── 4. FEATURE CARD — "Matrix Scan" ──
+   Green scan line sweep + corner bracket reveal + matrix glow */
+@keyframes matrix-scan-down {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+
+@keyframes corner-grow {
+    0% { transform: scaleX(0); opacity: 0; }
+    100% { transform: scaleX(1); opacity: 1; }
+}
+
+.feature-card::before,
+.feature-card::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.feature-card::before {
+    /* Scan line */
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--primary), var(--neon-green), var(--primary), transparent);
+    opacity: 0;
+    box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.feature-card::after {
+    /* Corner brackets */
+    inset: 0;
+    border: 1px solid transparent;
+    border-image: linear-gradient(135deg, var(--primary), transparent 40%, transparent 60%, var(--primary)) 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.feature-card:hover::before {
+    opacity: 0.8;
+    animation: matrix-scan-down 2s ease-in-out infinite;
+}
+
+.feature-card:hover::after {
+    opacity: 0.6;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 0 30px var(--primary-glow), 0 12px 40px rgba(0,0,0,0.5);
+    border-color: var(--primary);
+}
+
+/* ── 5. KANBAN CARD — "Tactical Sweep" ──
+   Light sweep + severity bar pulse + card number highlight */
+@keyframes kanban-sweep {
+    0% { transform: translateX(-100%); opacity: 0; }
+    15% { opacity: 0.4; }
+    85% { opacity: 0.4; }
+    100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes severity-bar-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.kanban-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+    transform: translateX(-100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.kanban-card:hover::after {
+    animation: kanban-sweep 1.4s ease-in-out infinite;
+}
+
+.kanban-card:hover::before {
+    animation: severity-bar-pulse 1.2s ease-in-out infinite;
+    opacity: 1;
+}
+
+.kanban-card:hover .card-number {
+    color: var(--severity-color, var(--text-1));
+    transition: color 0.2s ease;
+}
+
+/* ── 6. INCIDENT CARD — "Severity Pulse" ──
+   Left border glow animation + radar sweep dot + severity shadow intensity */
+@keyframes severity-glow-pulse {
+    0%, 100% { box-shadow: 0 4px 24px var(--severity-glow, rgba(0,0,0,0.15)); }
+    50% { box-shadow: 0 4px 40px var(--severity-glow, rgba(0,0,0,0.2)), 0 0 20px var(--severity-glow, transparent); }
+}
+
+.incident-card-tactical:hover {
+    transform: translateY(-3px);
+    animation: severity-glow-pulse 1.5s ease-in-out infinite;
+}
+
+.incident-card-tactical:hover .incident-card-number {
+    color: var(--severity-color, var(--neon-green));
+    transition: color 0.2s ease;
+}
+
+/* ── 7. COMMAND ALERT CARD — "Holo Flicker" ──
+   Purple holographic interference + neon edge trace + alert icon glow */
+@keyframes holo-interference {
+    0%, 100% { opacity: 0.5; }
+    8% { opacity: 0.9; }
+    16% { opacity: 0.6; }
+    24% { opacity: 0.95; }
+    32% { opacity: 0.5; }
+    60% { opacity: 0.75; }
+    76% { opacity: 0.55; }
+    92% { opacity: 0.85; }
+}
+
+.command-alert-card::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1px solid var(--accent-color, var(--electric-cyan));
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+
+.command-alert-card:hover::after {
+    opacity: 0.4;
+    animation: holo-interference var(--flicker-speed) ease-in-out infinite;
+}
+
+.command-alert-card:hover {
+    box-shadow: 0 0 20px var(--accent-color, transparent);
+}
+
+.command-alert-card:hover .alert-title {
+    text-shadow: 0 0 8px var(--accent-color, transparent);
+}
+
+/* ── 8. EMERGENCY CARD — "Heartbeat" ──
+   Red pulse ring expansion + heartbeat rhythm + emoji shake */
+@keyframes heartbeat-ring {
+    0%, 100% { transform: scale(1); opacity: 0.3; box-shadow: 0 0 0 0 rgba(255,59,92,0.3); }
+    14% { transform: scale(1.06); opacity: 0.6; box-shadow: 0 0 0 6px rgba(255,59,92,0.15); }
+    28% { transform: scale(1); opacity: 0.3; box-shadow: 0 0 0 0 rgba(255,59,92,0); }
+    42% { transform: scale(1.04); opacity: 0.5; box-shadow: 0 0 0 4px rgba(255,59,92,0.1); }
+    56% { transform: scale(1); opacity: 0.3; box-shadow: 0 0 0 0 rgba(255,59,92,0); }
+}
+
+.emergency-card::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid transparent;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.emergency-card:hover::after {
+    border-color: rgba(255,59,92,0.2);
+    animation: heartbeat-ring 1.2s ease-in-out infinite;
+}
+
+.emergency-card:hover .emoji {
+    animation: heartbeat-ring 1.2s ease-in-out infinite;
+    display: inline-block;
+}
+
+.emergency-card:hover {
+    box-shadow: 0 0 30px rgba(255,59,92,0.25);
+}
+
+/* ── 9. NOTIFICATION CARD — "Slide Reveal" ──
+   Left accent bar slides in + notification icon shake + pulse dot */
+@keyframes bell-shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(8deg); }
+    50% { transform: rotate(-8deg); }
+    75% { transform: rotate(4deg); }
+}
+
+.notification-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.notification-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--primary);
+    transform: translateX(-100%);
+    pointer-events: none;
+    z-index: 1;
+    transition: transform 0.3s ease;
+}
+
+.notification-card:hover::before {
+    transform: translateX(0);
+}
+
+.notification-card:hover .notification-icon {
+    animation: bell-shake 0.5s ease-in-out;
+    display: inline-block;
+}
+
+/* ── 10. CATEGORY CARD — "Selection Rise" ──
+    Expanding border glow + smooth lift + scale */
+.category-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.category-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--primary), var(--electric-cyan), var(--primary));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+
+.category-card:hover::before {
+    opacity: 0.5;
+}
+
+.category-card:hover {
+    transform: translateY(-4px) scale(1.04);
+    box-shadow: 0 0 24px var(--primary-glow);
+    border-color: var(--primary);
+}
+
+/* ── 11. STATS CARD — "Data Rise" ──
+    Number float + graph line draw-in + subtle lift */
+@keyframes graph-line-draw {
+    0% { transform: scaleX(0); opacity: 0; }
+    100% { transform: scaleX(1); opacity: 0.3; }
+}
+
+.stats-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--electric-cyan));
+    transform: scaleX(0);
+    transform-origin: left;
+    pointer-events: none;
+}
+
+.stats-card:hover::after {
+    animation: graph-line-draw 0.6s ease-out forwards;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    border-color: var(--glass-border-strong);
+}
+
+.stats-card:hover .stat-value {
+    transform: translateY(-2px);
+    text-shadow: 0 0 10px var(--primary-glow);
+    display: inline-block;
+}
+
+/* ── 12. CONFIG CARD — "Config Spin" ──
+    Subtle gear rotation + border trace + settings data pulse */
+@keyframes config-border-trace {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+.config-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.config-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--primary), var(--electric-cyan), var(--primary), transparent);
+    background-size: 200% 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.config-card:hover::after {
+    opacity: 0.6;
+    animation: config-border-trace 1.5s linear infinite;
+}
+
+.config-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--glass-border-strong);
+}
+
+.config-card:hover .config-icon {
+    animation: spin 2s linear infinite;
+    display: inline-block;
+}
+
+/* ── 13. TECH CARD — "Digital Noise" ──
+    Static noise overlay flicker + icon glow intensifies + border trace */
+@keyframes noise-flicker {
+    0%, 100% { opacity: 0; }
+    3% { opacity: 0.05; }
+    6% { opacity: 0; }
+    12% { opacity: 0.03; }
+    18% { opacity: 0; }
+    30% { opacity: 0.04; }
+    45% { opacity: 0; }
+    60% { opacity: 0.02; }
+    75% { opacity: 0; }
+    90% { opacity: 0.03; }
+    97% { opacity: 0; }
+}
+
+.tech-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.tech-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 128px 128px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+    border-radius: inherit;
+}
+
+.tech-card:hover::after {
+    animation: noise-flicker 3s steps(1) infinite;
+}
+
+.tech-card:hover .tech-card-icon {
+    box-shadow: 0 0 20px var(--primary-glow), 0 0 40px var(--primary-glow);
+    transform: scale(1.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tech-card:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35), 0 0 30px var(--primary-glow);
+    border-color: var(--primary);
+}
+
+/* ── 14. WEATHER STAT CARD — "Isotherm Pulse" ──
+    Temperature color pulse + stat glow + animated gradient */
+@keyframes isotherm-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+
+.weather-stat-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.weather-stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--electric-cyan), var(--info), var(--electric-cyan), transparent);
+    background-size: 200% 100%;
+    opacity: 0;
+    pointer-events: none;
+    animation: config-border-trace 2s linear infinite;
+}
+
+.weather-stat-card:hover::after {
+    opacity: 0.7;
+}
+
+.weather-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,212,255,0.12), 0 12px 40px rgba(0,0,0,0.3);
+    border-color: var(--electric-cyan);
+    background: linear-gradient(180deg, rgba(0,212,255,0.06), rgba(0,212,255,0.02)), var(--bg-surface);
+}
+
+.weather-stat-card:hover strong {
+    color: var(--electric-cyan);
+    text-shadow: 0 0 12px var(--electric-cyan-glow);
+    transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+/* ── 15. WEATHER ALERT CARD — "Alert Flash" ──
+    Pulsing border flash + color-code glow */
+@keyframes alert-border-flash {
+    0%, 100% { border-color: inherit; opacity: 0.4; }
+    50% { border-color: inherit; opacity: 0.9; }
+}
+
+.weather-alert-card {
+    transition: all 0.3s ease, border-color 0.3s ease;
+}
+
+.weather-alert-card:hover {
+    transform: translateX(3px);
+    box-shadow: 0 0 16px rgba(255,59,92,0.2);
+    animation: alert-border-flash 1s ease-in-out infinite;
+}
+
+.weather-alert-danger:hover {
+    border-color: rgba(255,59,92,0.7);
+    box-shadow: 0 0 16px rgba(255,59,92,0.3);
+}
+
+.weather-alert-warning:hover {
+    border-color: rgba(255,149,0,0.7);
+    box-shadow: 0 0 16px rgba(255,149,0,0.3);
+}
+
+.weather-alert-info:hover {
+    border-color: rgba(59,130,246,0.7);
+    box-shadow: 0 0 16px rgba(59,130,246,0.3);
+}
+
+.weather-alert-success:hover {
+    border-color: rgba(0,255,136,0.6);
+    box-shadow: 0 0 16px rgba(0,255,136,0.25);
+}
+
+/* ── 16. SOS LOG ITEM — "Red Pulse" ──
+    Emergency accent pulse + glow intensify */
+@keyframes sos-pulse-accent {
+    0%, 100% { box-shadow: 0 0 4px var(--alert-red-glow); }
+    50% { box-shadow: 0 0 16px var(--alert-red-glow); }
+}
+
+.sos-log-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.sos-log-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--alert-red);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sos-log-item:hover::before {
+    opacity: 0.8;
+}
+
+.sos-log-item:hover {
+    border-color: var(--alert-red);
+    background: rgba(255,59,92,0.06);
+    animation: sos-pulse-accent 1.5s ease-in-out infinite;
+    transform: translateX(2px);
+}
+
+/* ── 17. DASHBOARD INCIDENT ITEM — "Report Scan" ──
+    Left-to-right scan line + severity dot pulse + border glow */
+@keyframes report-scan-line {
+    0% { transform: translateX(-100%); }
+    60% { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
+}
+
+.dashboard-incident-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-incident-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 30px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.08), transparent);
+    transform: translateX(-100%);
+    pointer-events: none;
+}
+
+.dashboard-incident-item:hover::after {
+    animation: report-scan-line 1.2s ease-in-out;
+}
+
+.dashboard-incident-item:hover {
+    border-color: var(--primary);
+    background: rgba(0,255,136,0.04);
+    box-shadow: 0 0 12px var(--primary-glow);
+    transform: translateX(2px);
+}
+
+.dashboard-incident-item:hover strong {
+    color: var(--primary);
+}
+
+.dashboard-incident-item:hover .badge {
+    box-shadow: 0 0 8px currentColor;
+}
+
+/* ── 18. GLASS ELEVATED — "Premium Lift" ──
+    Enhanced depth + multi-shadow + gradient border animation */
+@keyframes glow-breathe {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
+.glass-elevated {
+    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.glass-elevated:hover {
+    transform: translateY(-4px) scale(1.01);
+}
+
+.glass-elevated:hover::before {
+    animation: glow-breathe 2s ease-in-out infinite;
+}
+
+/* ── 19. TECH ITEM — "Circuit Glow" ──
+    Circuit trace border + icon pulse */
+.tech-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.tech-item::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1px solid transparent;
+    border-image: linear-gradient(135deg, var(--neon-green), transparent 40%, transparent 60%, var(--electric-cyan)) 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.tech-item:hover::after {
+    opacity: 0.5;
+}
+
+.tech-item:hover {
+    border-color: transparent;
+    box-shadow: 0 0 20px var(--neon-green-glow), 0 8px 32px rgba(0,0,0,0.5);
+    background: rgba(0,255,136,0.06);
+}
+
+/* ── 20. TYPE CARD — "Purple Haze" ──
+    Purple glow expansion + label highlight */
+.type-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.type-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--command-purple), var(--electric-cyan), var(--command-purple));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.type-card:hover::before {
+    opacity: 0.5;
+    animation: glow-breathe 2s ease-in-out infinite;
+}
+
+.type-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 24px var(--command-purple-glow);
+    border-color: var(--command-purple);
+}
+
+/* ── 21. SOS RESULT CARD — "Success Pulse" ──
+    Green pulse ring + icon celebration glow */
+.sos-result-card::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    border: 1px solid var(--neon-green);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sos-result-card:hover::after {
+    opacity: 0.3;
+    animation: neon-ring-pulse 1.5s ease-in-out infinite;
+}
+
+.sos-result-card:hover .sos-result-icon {
+    box-shadow: 0 0 30px rgba(0,255,136,0.4);
+    transform: scale(1.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ── 22. COMMAND TABLE ROWS — "Row Scan" ──
+    Subtle row highlight with data-stream feel */
+.command-table tbody tr {
+    position: relative;
+}
+
+.command-table tbody tr::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transform: scaleX(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.command-table tbody tr:hover::after {
+    opacity: 0.5;
+    transform: scaleX(1);
+}
+
+.command-table tbody tr:hover td {
+    background: rgba(0,255,136,0.03);
+    transition: background 0.2s ease;
+}
+
+/* ── 23. HOVER LIFT — generic enhanced lift ── */
+.hover-lift:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+    border-color: var(--primary);
+}
+
+/* ════════════════════════════════════════
+   Graceful degradation for reduced motion
+   ════════════════════════════════════════ */
 
 /* ============================================
    Accessibility: prefers-reduced-motion

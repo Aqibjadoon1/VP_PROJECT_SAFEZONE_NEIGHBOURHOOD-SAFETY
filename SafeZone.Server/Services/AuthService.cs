@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using SafeZone.Server.Data;
 using SafeZone.Server.DTOs;
@@ -18,23 +19,44 @@ public class AuthService : IAuthService
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly SafeZoneDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthService>? _logger;
 
     public AuthService(
         UserManager<User> userManager,
         RoleManager<IdentityRole<Guid>> roleManager,
         SafeZoneDbContext context,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<AuthService>? logger = null)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
     {
+        var phone = dto.PhoneNumber?.Trim() ?? string.Empty;
+        var email = dto.Email?.Trim();
+
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return new AuthResponseDto { Success = false, Message = "Phone number is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.FullName))
+        {
+            return new AuthResponseDto { Success = false, Message = "Full name is required." };
+        }
+
+        if (dto.Password != dto.ConfirmPassword)
+        {
+            return new AuthResponseDto { Success = false, Message = "Passwords do not match." };
+        }
+
         var existingUser = await _userManager.Users
-            .FirstOrDefaultAsync(u => u.PhoneNumber == dto.PhoneNumber);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phone);
 
         if (existingUser != null)
         {
@@ -47,16 +69,38 @@ public class AuthService : IAuthService
 
         var user = new User
         {
-            UserName = dto.PhoneNumber,
-            PhoneNumber = dto.PhoneNumber,
-            FullName = dto.FullName,
+            UserName = phone,
+            PhoneNumber = phone,
+            FullName = dto.FullName?.Trim() ?? string.Empty,
             Role = dto.Role,
             CreatedAt = DateTime.UtcNow,
             IsActive = true,
-            Email = null
+            Email = email
         };
 
-        var result = await _userManager.CreateAsync(user, dto.Password);
+        IdentityResult result;
+        try
+        {
+            result = await _userManager.CreateAsync(user, dto.Password);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger?.LogError(ex, "Database error while registering phone {Phone}.", phone);
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Registration failed because the account could not be saved. Please try again."
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error while registering phone {Phone}.", phone);
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Registration failed unexpectedly. Please try again."
+            };
+        }
 
         if (!result.Succeeded)
         {
@@ -71,39 +115,86 @@ public class AuthService : IAuthService
         var roleName = dto.Role.ToString();
         if (!await _roleManager.RoleExistsAsync(roleName))
         {
-            await _roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
+            var roleCreateResult = await _roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
+            if (!roleCreateResult.Succeeded)
+            {
+                _logger?.LogError(
+                    "Role creation failed for {Role}: {Errors}",
+                    roleName,
+                    string.Join(", ", roleCreateResult.Errors.Select(e => e.Description)));
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Account was created, but role setup failed. Contact an administrator."
+                };
+            }
         }
-        await _userManager.AddToRoleAsync(user, roleName);
+        var roleResult = await _userManager.AddToRoleAsync(user, roleName);
+        if (!roleResult.Succeeded)
+        {
+            _logger?.LogError(
+                "Role assignment failed for user {UserId}: {Errors}",
+                user.Id,
+                string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Account was created, but role assignment failed. Contact an administrator."
+            };
+        }
 
-        var token = await GenerateJwtTokenAsync(user);
-        var refreshToken = GenerateRefreshToken();
+        string? token = null;
+        string? refreshToken = null;
+        DateTime? expiresAt = null;
+        var message = "Account created successfully.";
 
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-        await _userManager.UpdateAsync(user);
+        try
+        {
+            token = await GenerateJwtTokenAsync(user);
+            refreshToken = GenerateRefreshToken();
+            expiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpiryMinutes", 15));
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                _logger?.LogWarning(
+                    "Refresh token update failed for user {UserId}: {Errors}",
+                    user.Id,
+                    string.Join(", ", updateResult.Errors.Select(e => e.Description)));
+                refreshToken = null;
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            _logger?.LogWarning(ex, "Account {UserId} created, but JWT token could not be issued.", user.Id);
+            message = "Account created successfully. Please log in.";
+        }
 
         return new AuthResponseDto
         {
             Success = true,
-            Message = "Registration successful.",
+            Message = message,
             Token = token,
             RefreshToken = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpiryMinutes", 15)),
+            ExpiresAt = expiresAt,
             User = MapToUserDto(user)
         };
     }
 
     public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
     {
+        var login = dto.Identifier?.Trim() ?? string.Empty;
         var user = await _userManager.Users
-            .FirstOrDefaultAsync(u => u.PhoneNumber == dto.PhoneNumber);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == login || u.Email == login || u.UserName == login);
 
         if (user == null)
         {
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "Invalid phone number or password."
+                Message = "Invalid credentials. Check your phone, email, or password."
             };
         }
 
@@ -116,10 +207,20 @@ public class AuthService : IAuthService
             };
         }
 
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Account is locked out due to too many failed attempts. Try again later."
+            };
+        }
+
         var result = await _userManager.CheckPasswordAsync(user, dto.Password);
 
         if (!result)
         {
+            await _userManager.AccessFailedAsync(user);
             return new AuthResponseDto
             {
                 Success = false,
@@ -127,6 +228,7 @@ public class AuthService : IAuthService
             };
         }
 
+        await _userManager.ResetAccessFailedCountAsync(user);
         user.LastActiveAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
@@ -230,7 +332,7 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.UserName ?? user.PhoneNumber ?? string.Empty),
             new Claim(ClaimTypes.MobilePhone, user.PhoneNumber ?? string.Empty),
-            new Claim("FullName", user.FullName),
+            new Claim("FullName", user.FullName ?? string.Empty),
             new Claim("Role", user.Role.ToString())
         };
 
@@ -266,7 +368,7 @@ public class AuthService : IAuthService
         {
             Id = user.Id,
             PhoneNumber = user.PhoneNumber ?? string.Empty,
-            FullName = user.FullName,
+            FullName = user.FullName ?? string.Empty,
             Role = user.Role,
             LastKnownLatitude = user.LastKnownLatitude,
             LastKnownLongitude = user.LastKnownLongitude,

@@ -75,7 +75,7 @@
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
                                             <span class="text-xs font-mono text-muted">@inc.IncidentNumber</span>
-                                            <span class="badge badge-@GetStatusBadge(inc.Status) text-xs">@GetStatusLabel(inc.Status)</span>
+                                            <StatusChip Status="@inc.Status" />
                                         </div>
                                         <p class="font-medium text-sm truncate">@inc.Title</p>
                                         <p class="text-xs text-muted truncate mt-0.5">@inc.Address</p>
@@ -109,7 +109,7 @@
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="p-4 rounded-lg" style="background: var(--glass);">
                     <p class="text-xs text-muted mb-1">Status</p>
-                    <span class="badge badge-@GetStatusBadge(selectedIncident.Status)">@GetStatusLabel(selectedIncident.Status)</span>
+                    <StatusChip Status="@selectedIncident.Status" />
                 </div>
                 <div class="p-4 rounded-lg" style="background: var(--glass);">
                     <p class="text-xs text-muted mb-1">Severity</p>

@@ -1,0 +1,4 @@
+__SAFEZONE_HOSTNAME__ {
+    encode gzip zstd
+    reverse_proxy safezone:8080
+}

@@ -71,7 +71,7 @@
                                     <td class="p-3 text-muted">@user.PhoneNumber</td>
                                     <td class="p-3"><span class="badge badge-@GetRoleBadge(user.Role)">@user.Role</span></td>
                                     <td class="p-3">
-                                        <span class="badge @(user.IsActive ? "badge-success" : "badge-secondary")">@(user.IsActive ? "Active" : "Inactive")</span>
+                                        <StatusChip Status="@user.IsActive" />
                                     </td>
                                     <td class="p-3 text-muted text-xs">@FormatDate(user.CreatedAt)</td>
                                     <td class="p-3">

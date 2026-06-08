@@ -51,10 +51,7 @@
                                 <div class="text-xs text-muted mt-1">Incident ID: @(fir.IncidentId.ToString()[..Math.Min(8, fir.IncidentId.ToString().Length)])</div>
                             </td>
                             <td class="p-4">
-                                <span class="status-badge @GetStatusClass(fir.Status)">
-                                    <span>@GetStatusIcon(fir.Status)</span>
-                                    @GetStatusLabel(fir.Status)
-                                </span>
+                                <StatusChip Status="@fir.Status" />
                             </td>
                             <td class="p-4">
                                 <div class="text-sm">@fir.SubmittedAt.ToLocalTime().ToString("MMM dd, yyyy")</div>
@@ -108,10 +105,7 @@
             <div class="p-6">
                 <div class="mb-6">
                     <div class="flex items-center gap-3 mb-2">
-                        <span class="status-badge @GetStatusClass(selectedFir.Status)">
-                            <span>@GetStatusIcon(selectedFir.Status)</span>
-                            @GetStatusLabel(selectedFir.Status)
-                        </span>
+                        <StatusChip Status="@selectedFir.Status" />
                     </div>
                     @if (selectedFir.Status == FIRStatus.Rejected && !string.IsNullOrEmpty(selectedFir.RejectionReason))
                     {
@@ -281,7 +275,6 @@
     private int? currentFilter;
     private bool showModal;
     private FirResponseDto? selectedFir;
-    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -290,22 +283,14 @@
 
     private async Task LoadFirs()
     {
-        try
-        {
-            isLoading = true;
-            var state = await AuthState.GetAuthenticationStateAsync();
-            var user = state.User;
-            var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-            if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
-                return;
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User;
+        var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            return;
 
-            allFirs = await FirService.GetMyFirsAsync(userId);
-            ApplyFilter();
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        allFirs = await FirService.GetMyFirsAsync(userId);
+        ApplyFilter();
     }
 
     private void FilterByStatus(int? status)

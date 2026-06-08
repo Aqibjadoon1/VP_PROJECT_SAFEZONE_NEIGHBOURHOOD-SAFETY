@@ -84,7 +84,7 @@
                                             <span class="text-sm">@incident.CategoryName</span>
                                         </td>
                                         <td class="p-4">
-                                            <span class="badge @GetStatusBadge(incident.Status)">@GetStatusLabel(incident.Status)</span>
+                                            <StatusChip Status="@incident.Status" />
                                         </td>
                                         <td class="p-4">
                                             <span style="color: @GetSeverityColor(incident.Severity); font-weight: 500; font-size: 0.875rem;">@GetSeverityLabel(incident.Severity)</span>
@@ -125,7 +125,7 @@
             <div class="p-6 space-y-4">
                 <div>
                     <p class="text-xs text-muted mb-2">Current Status</p>
-                    <span class="badge @GetStatusBadge(updatingIncident.Status)">@GetStatusLabel(updatingIncident.Status)</span>
+                    <StatusChip Status="@updatingIncident.Status" />
                 </div>
                 <div>
                     <label class="text-xs text-muted block mb-2">New Status</label>

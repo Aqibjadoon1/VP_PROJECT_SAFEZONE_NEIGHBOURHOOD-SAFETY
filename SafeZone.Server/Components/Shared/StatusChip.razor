@@ -1,29 +1,12 @@
-<span class="status-chip @GetStatusClass()">
+@using SafeZone.Server.Services
+
+<span class="status-chip @Presentation.CssClass" title="@Presentation.Label">
     <span class="dot"></span>
-    @Status switch
-    {
-        nameof(IncidentStatus.Pending) => "Pending",
-        nameof(IncidentStatus.Assigned) => "Assigned",
-        nameof(IncidentStatus.InProgress) => "In Progress",
-        nameof(IncidentStatus.Resolved) => "Resolved",
-        nameof(IncidentStatus.Closed) => "Closed",
-        _ => Status
-    }
+    @Presentation.Label
 </span>
 
 @code {
-    [Parameter] public string Status { get; set; } = "";
+    [Parameter] public object? Status { get; set; }
 
-    private string GetStatusClass()
-    {
-        return Status switch
-        {
-            nameof(IncidentStatus.Pending) => "pending",
-            nameof(IncidentStatus.Assigned) => "assigned",
-            nameof(IncidentStatus.InProgress) => "inprogress",
-            nameof(IncidentStatus.Resolved) => "resolved",
-            nameof(IncidentStatus.Closed) => "closed",
-            _ => "pending"
-        };
-    }
+    private StatusPresentation Presentation => StatusPresenter.From(Status);
 }

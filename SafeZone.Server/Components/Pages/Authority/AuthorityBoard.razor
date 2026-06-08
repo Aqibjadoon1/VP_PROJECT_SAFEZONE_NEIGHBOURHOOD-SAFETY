@@ -29,22 +29,22 @@ else
 
 <SectionContainer Title="Quick Actions">
     <div class="action-grid">
-        <a href="/authority/dispatch" class="action-card">
+        <a href="/authority/dispatch" class="action-card accent-primary">
             <div class="action-icon" style="background: var(--primary-dim); color: var(--primary);">&#x1F5FA;</div>
             <div class="action-label">Dispatch Map</div>
             <div class="action-desc">Real-time incident dispatch</div>
         </a>
-        <a href="/authority/field-reports" class="action-card">
+        <a href="/authority/field-reports" class="action-card accent-warning">
             <div class="action-icon" style="background: var(--warning-dim); color: var(--warning);">&#x1F4CB;</div>
             <div class="action-label">Field Reports</div>
             <div class="action-desc">View and manage reports</div>
         </a>
-        <a href="/authority/fir-management" class="action-card">
+        <a href="/authority/fir-management" class="action-card accent-info">
             <div class="action-icon" style="background: var(--info-dim); color: var(--info);">&#x1F4C4;</div>
             <div class="action-label">FIR Management</div>
             <div class="action-desc">Review and process FIRs</div>
         </a>
-        <a href="/authority/settings" class="action-card">
+        <a href="/authority/settings" class="action-card accent-danger">
             <div class="action-icon" style="background: var(--danger-dim); color: var(--danger);">&#x1F4E2;</div>
             <div class="action-label">Broadcast Alert</div>
             <div class="action-desc">Send public alerts</div>
@@ -80,7 +80,7 @@ else
                                 <tr @onclick='() => Navigation.NavigateTo("/authority/field-reports")'>
                                     <td class="mono-cell">@incident.IncidentNumber</td>
                                     <td class="font-medium">@incident.Title</td>
-                                    <td><StatusChip Status="@incident.Status.ToString()" /></td>
+                                    <td><StatusChip Status="@incident.Status" /></td>
                                     <td><SeverityChip Severity="@incident.Severity" /></td>
                                     <td style="color: var(--text-3); font-size: 11px;">@incident.ReportedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
                                 </tr>

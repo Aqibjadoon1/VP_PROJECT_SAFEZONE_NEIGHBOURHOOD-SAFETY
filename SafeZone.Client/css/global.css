@@ -163,6 +163,24 @@ body::after {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.glass-elevated:hover {
+    border-color: var(--glass-border-strong);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,255,136,0.15);
+}
+
+/* Card-specific hover with outlined border matching command centre style */
+.feature-card:hover,
+.glass-card:hover,
+.metric-card:hover,
+.action-card:hover,
+.kanban-card:hover,
+.stat-card:hover,
+.incident-card:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px var(--primary) !important;
 }
 
 /* 4. Custom scrollbar */
@@ -320,7 +338,12 @@ label {
 
 .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px var(--primary-glow);
+    box-shadow: 0 8px 24px var(--primary-glow), 0 0 0 1px rgba(0,255,136,0.3);
+}
+
+/* Shadow box hover at 75% opacity - applies to ALL buttons */
+.btn:hover:not(:disabled) {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.75);
 }
 
 .btn-secondary {

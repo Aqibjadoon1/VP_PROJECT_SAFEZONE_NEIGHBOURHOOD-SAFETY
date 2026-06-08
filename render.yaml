@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: safezone
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: PORT
+        value: "8080"
+      - key: Jwt__Key
+        generateValue: true
+      - key: Jwt__Issuer
+        value: SafeZone
+      - key: Jwt__Audience
+        value: SafeZoneClient
+      - key: ElevenLabs__AgentId
+        value: agent_7201ktkdw5kteq3abwcn9hjwe0c9
+      - key: ElevenLabs__AllowUnsignedServerTools
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: Gmail__ClientId
+        sync: false
+      - key: Gmail__ClientSecret
+        sync: false
+      - key: Gmail__RefreshToken
+        sync: false
+      - key: Gmail__FromEmail
+        sync: false
+      - key: Slack__WebhookUrl
+        sync: false

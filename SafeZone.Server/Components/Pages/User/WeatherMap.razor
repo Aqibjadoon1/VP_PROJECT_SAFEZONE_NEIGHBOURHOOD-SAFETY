@@ -294,7 +294,9 @@
 
     private async Task SwitchLayerAsync(string layer)
     {
-        _debounceCts?.Cancel();
+        var oldCts = _debounceCts;
+        oldCts?.Cancel();
+        oldCts?.Dispose();
         _debounceCts = new CancellationTokenSource();
         var token = _debounceCts.Token;
         try

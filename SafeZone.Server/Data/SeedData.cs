@@ -6,7 +6,7 @@ namespace SafeZone.Server.Data;
 
 public static class SeedData
 {
-    public static async Task InitializeAsync(IServiceProvider serviceProvider, bool ensureCreated = false)
+    public static async Task InitializeAsync(IServiceProvider serviceProvider, bool isDevelopment, bool ensureCreated = false)
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<SafeZoneDbContext>();
@@ -21,7 +21,11 @@ public static class SeedData
         await SeedRolesAsync(roleManager);
         await SeedCategoriesAsync(context);
         await SeedTestUsersAsync(userManager, roleManager, context);
-        await SeedSampleIncidentsAsync(context, userManager);
+
+        if (isDevelopment)
+        {
+            await SeedSampleIncidentsAsync(context, userManager);
+        }
     }
 
     private static async Task SeedRolesAsync(RoleManager<IdentityRole<Guid>> roleManager)
@@ -65,15 +69,54 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedTestUsersAsync(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager, SafeZoneDbContext context)
+    private static readonly string[] GeneratedPasswords = new string[3];
+
+    private static string GenerateRandomPassword(int length = 16)
     {
-        var superAdmin = await EnsureTestUserAsync(userManager, "admin@safezone.pk", "+92511234567", "SafeZone Administrator", UserRole.SuperAdmin, "Admin123!", 5.0, 33.6844, 73.0479);
+        const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string lowercase = "abcdefghijklmnopqrstuvwxyz";
+        const string digits = "0123456789";
+        const string symbols = "!@#$%^&*";
+        const string allChars = uppercase + lowercase + digits + symbols;
+
+        length = Math.Max(length, 8);
+        var random = Random.Shared;
+        var result = new List<char>(length)
+        {
+            uppercase[random.Next(uppercase.Length)],
+            lowercase[random.Next(lowercase.Length)],
+            digits[random.Next(digits.Length)],
+            symbols[random.Next(symbols.Length)]
+        };
+
+        while (result.Count < length)
+        {
+            result.Add(allChars[random.Next(allChars.Length)]);
+        }
+
+        for (var i = result.Count - 1; i > 0; i--)
+        {
+            var j = random.Next(i + 1);
+            (result[i], result[j]) = (result[j], result[i]);
+        }
+
+        return new string(result.ToArray());
+    }
+
+    private static async Task SeedTestUsersAsync(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager, SafeZoneDbContext context, ILogger? logger = null)
+    {
+        // Generate strong random passwords once per app startup
+        GeneratedPasswords[0] = GenerateRandomPassword();
+        GeneratedPasswords[1] = GenerateRandomPassword();
+        GeneratedPasswords[2] = GenerateRandomPassword();
+
+        var superAdmin = await EnsureTestUserAsync(userManager, "admin@safezone.pk", "+92511234567", "SafeZone Administrator", UserRole.SuperAdmin, GeneratedPasswords[0], 5.0, 33.6844, 73.0479);
         if (!await userManager.IsInRoleAsync(superAdmin, "SuperAdmin"))
         {
             await userManager.AddToRoleAsync(superAdmin, "SuperAdmin");
         }
 
-        var authorityUser = await EnsureTestUserAsync(userManager, "officer@safezone.pk", "+92511112233", "Inspector Ahmed Khan", UserRole.Authority, "Officer123!", 10.0, 33.6938, 73.0560);
+        var authorityUser = await EnsureTestUserAsync(userManager, "officer@safezone.pk", "+92511112233", "Inspector Ahmed Khan", UserRole.Authority, GeneratedPasswords[1], 10.0, 33.6938, 73.0560);
         if (!await userManager.IsInRoleAsync(authorityUser, "Authority"))
         {
             await userManager.AddToRoleAsync(authorityUser, "Authority");
@@ -102,13 +145,18 @@ public static class SeedData
             await context.SaveChangesAsync();
         }
 
-        var residentUser = await EnsureTestUserAsync(userManager, "user@safezone.pk", "+923001234567", "Ali Hassan", UserRole.Resident, "User123!", 2.0, 33.6650, 73.0770);
+        var residentUser = await EnsureTestUserAsync(userManager, "user@safezone.pk", "+923001234567", "Ali Hassan", UserRole.Resident, GeneratedPasswords[2], 2.0, 33.6650, 73.0770);
         if (!await userManager.IsInRoleAsync(residentUser, "Resident"))
         {
             await userManager.AddToRoleAsync(residentUser, "Resident");
         }
 
         await context.SaveChangesAsync();
+
+        // Log generated passwords so developers can log in during development
+        logger?.LogInformation(
+            "Seeded user passwords: SuperAdmin={SuperAdminPwd}, Authority={AuthorityPwd}, Resident={ResidentPwd}",
+            GeneratedPasswords[0], GeneratedPasswords[1], GeneratedPasswords[2]);
     }
 
     private static async Task<User> EnsureTestUserAsync(
@@ -132,6 +180,7 @@ public static class SeedData
                 UserName = userName,
                 PhoneNumber = phoneNumber,
                 FullName = fullName,
+                Email = userName,
                 Role = role,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true,
@@ -149,6 +198,7 @@ public static class SeedData
             return user;
         }
 
+        // Only update metadata, NEVER reset the password on startup
         if (user.FullName != fullName || user.Role != role)
         {
             user.FullName = fullName;
@@ -159,16 +209,6 @@ public static class SeedData
             user.LastKnownLongitude = longitude;
 
             await userManager.UpdateAsync(user);
-        }
-
-        if (!await userManager.CheckPasswordAsync(user, password))
-        {
-            var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var resetResult = await userManager.ResetPasswordAsync(user, token, password);
-            if (!resetResult.Succeeded)
-            {
-                throw new InvalidOperationException($"Failed to reset seeded password for {fullName}: {string.Join(", ", resetResult.Errors.Select(e => e.Description))}");
-            }
         }
 
         return user;

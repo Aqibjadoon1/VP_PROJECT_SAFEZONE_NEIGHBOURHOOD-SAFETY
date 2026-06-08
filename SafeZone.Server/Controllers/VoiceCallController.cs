@@ -26,8 +26,11 @@ public class VoiceCallController : ControllerBase
 
     [HttpPost("start")]
     [Authorize(Roles = "Authority,SuperAdmin")]
-    public async Task<ActionResult<CallResponseDto>> StartCall(StartCallDto dto)
+    public async Task<ActionResult<CallResponseDto>> StartCall([FromBody] StartCallDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         if (string.IsNullOrWhiteSpace(dto.PhoneNumber))
         {
             return BadRequest(new { message = "Phone number is required" });
@@ -52,9 +55,9 @@ public class VoiceCallController : ControllerBase
                 IsMockMode = _voiceCallService.IsMockMode
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return BadRequest(new { message = ex.Message });
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to start call." });
         }
     }
 
@@ -86,8 +89,8 @@ public class VoiceCallController : ControllerBase
             return NotFound(new { message = "Call not found" });
         }
 
-        var userRole = User.FindFirstValue(ClaimTypes.Role);
-        if (userRole != "Authority" && userRole != "SuperAdmin")
+        var isAuthority = User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+        if (!isAuthority)
         {
             var userId = GetCurrentUserId();
             if (session.TriggeredByUserId != userId)
@@ -116,8 +119,8 @@ public class VoiceCallController : ControllerBase
             return NotFound(new { message = "Call not found" });
         }
 
-        var userRole = User.FindFirstValue(ClaimTypes.Role);
-        if (userRole != "Authority" && userRole != "SuperAdmin")
+        var isAuthority = User.IsInRole("Authority") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+        if (!isAuthority)
         {
             var userId = GetCurrentUserId();
             if (session.TriggeredByUserId != userId)
@@ -126,19 +129,19 @@ public class VoiceCallController : ControllerBase
             }
         }
 
-        var transcript = session.Transcript.Select(t => new TranscriptSegmentDto
+        var transcript = session.Transcript?.Select(t => new TranscriptSegmentDto
         {
             Speaker = t.Speaker.ToString(),
             Text = t.Text,
             Timestamp = t.Timestamp
-        }).ToList();
+        }).ToList() ?? new List<TranscriptSegmentDto>();
 
         return Ok(transcript);
     }
 
     [HttpPost("{callId}/end")]
     [Authorize(Roles = "Authority,SuperAdmin")]
-    public async Task<IActionResult> EndCall(Guid callId, [FromBody] string? reason = null)
+    public async Task<IActionResult> EndCall(Guid callId, [FromBody] EndCallDto? dto)
     {
         var session = await _voiceCallService.GetCallAsync(callId);
         if (session == null)
@@ -146,7 +149,7 @@ public class VoiceCallController : ControllerBase
             return NotFound(new { message = "Call not found" });
         }
 
-        await _voiceCallService.EndCallAsync(callId, reason);
+        await _voiceCallService.EndCallAsync(callId, dto?.Reason);
 
         return Ok(new { message = "Call ended", callId });
     }
