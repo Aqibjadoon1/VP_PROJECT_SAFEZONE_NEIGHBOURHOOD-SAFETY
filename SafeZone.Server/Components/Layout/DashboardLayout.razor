@@ -4,10 +4,10 @@
 @inject AuthenticationStateProvider Auth
 @inject IJSRuntime JS
 
-<div class="dashboard-theme-shell" style="display:flex;min-height:100vh;">
+<div class="dashboard-theme-shell">
     <div class="ambient-glow-2"></div>
 
-    <aside class="dashboard-theme-sidebar @(_sidebarOpen ? "is-open" : "")" style="width:280px;flex-shrink:0;position:sticky;top:0;height:100vh;">
+    <aside class="dashboard-theme-sidebar @(_sidebarOpen ? "is-open" : "")">
         <a href="@HomeHref" class="dashboard-theme-logo">
             <span class="dashboard-theme-logo-mark">
                 <EeLogo Size="38" />
@@ -30,7 +30,7 @@
         <button type="button" class="dashboard-theme-overlay is-open" @onclick="ToggleSidebar" aria-label="Close menu"></button>
     }
 
-    <main class="dashboard-theme-main @(_sidebarOpen ? "sidebar-shifted" : "")" style="flex:1;min-width:0;" @onclick="CloseSidebarOnOutsideTap">
+    <main class="dashboard-theme-main @(_sidebarOpen ? "sidebar-shifted" : "")" @onclick="CloseSidebarOnOutsideTap">
         <StatusBar />
         <header class="dashboard-theme-topbar">
             <div class="dashboard-theme-topbar-title">

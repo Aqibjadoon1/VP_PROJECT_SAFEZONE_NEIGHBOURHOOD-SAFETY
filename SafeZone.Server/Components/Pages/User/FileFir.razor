@@ -53,8 +53,11 @@
         to { opacity: 1; transform: translateY(0); }
     }
     #fir-map {
+        width: 100%;
+        min-height: 320px;
         border-radius: 12px;
         border: 2px solid var(--glass-border);
+        overflow: hidden;
     }
     .form-section {
         background: var(--glass);
@@ -168,7 +171,7 @@
                             <label class="text-sm font-medium">Mark Location on Map (Optional)</label>
                             <button type="button" class="btn btn-secondary btn-sm" @onclick="UseMyLocation">📍 Use My Location</button>
                         </div>
-                        <div id="fir-map" style="width: 100%; height: 250px;"></div>
+                        <div id="fir-map"></div>
                         <p class="text-xs text-muted mt-2">Click on the map to select precise location</p>
                     </div>
                     <div class="mb-6">
@@ -345,6 +348,7 @@
     private double? SelectedLat;
     private double? SelectedLng;
     private DotNetObjectReference<FileFir>? _dotNetRef;
+    private bool _mapInitialized;
 
     private bool CanGoStep2 =>
         !string.IsNullOrWhiteSpace(Model.ComplainantName) &&
@@ -406,14 +410,22 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (CurrentStep == 2)
         {
             try
             {
-                await JS.InvokeVoidAsync("safezoneMap.init", "fir-map", new { zoomControl = false, scrollWheelZoom = false });
-                _dotNetRef?.Dispose();
-                _dotNetRef = DotNetObjectReference.Create(this);
-                await JS.InvokeVoidAsync("safezoneMap.enableDotNetLocationPicker", "fir-map", _dotNetRef);
+                if (!_mapInitialized)
+                {
+                    await JS.InvokeVoidAsync("safezoneMap.init", "fir-map", new { zoomControl = true, scrollWheelZoom = false });
+                    _dotNetRef?.Dispose();
+                    _dotNetRef = DotNetObjectReference.Create(this);
+                    await JS.InvokeVoidAsync("safezoneMap.enableDotNetLocationPicker", "fir-map", _dotNetRef);
+                    _mapInitialized = true;
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("safezoneMap.invalidate", "fir-map");
+                }
             }
             catch { /* ignore for prerendering */ }
         }
