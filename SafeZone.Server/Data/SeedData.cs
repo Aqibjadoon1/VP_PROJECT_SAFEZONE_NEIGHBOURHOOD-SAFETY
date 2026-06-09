@@ -12,6 +12,8 @@ public static class SeedData
         var context = scope.ServiceProvider.GetRequiredService<SafeZoneDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        var configuration = scope.ServiceProvider.GetService<IConfiguration>();
+        var logger = scope.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("SeedData");
 
         if (ensureCreated)
         {
@@ -20,7 +22,12 @@ public static class SeedData
 
         await SeedRolesAsync(roleManager);
         await SeedCategoriesAsync(context);
-        await SeedTestUsersAsync(userManager, roleManager, context);
+        await SeedTestUsersAsync(
+            userManager,
+            roleManager,
+            context,
+            configuration?["SeedData:SuperAdminPassword"],
+            logger);
 
         if (isDevelopment)
         {
@@ -103,18 +110,27 @@ public static class SeedData
         return new string(result.ToArray());
     }
 
-    private static async Task SeedTestUsersAsync(UserManager<User> userManager, RoleManager<IdentityRole<Guid>> roleManager, SafeZoneDbContext context, ILogger? logger = null)
+    private static async Task SeedTestUsersAsync(
+        UserManager<User> userManager,
+        RoleManager<IdentityRole<Guid>> roleManager,
+        SafeZoneDbContext context,
+        string? configuredSuperAdminPassword,
+        ILogger? logger = null)
     {
         // Generate strong random passwords once per app startup
         GeneratedPasswords[0] = GenerateRandomPassword();
         GeneratedPasswords[1] = GenerateRandomPassword();
         GeneratedPasswords[2] = GenerateRandomPassword();
 
-        var superAdmin = await EnsureTestUserAsync(userManager, "admin@safezone.pk", "+92511234567", "SafeZone Administrator", UserRole.SuperAdmin, GeneratedPasswords[0], 5.0, 33.6844, 73.0479);
+        var superAdminPassword = string.IsNullOrWhiteSpace(configuredSuperAdminPassword)
+            ? GeneratedPasswords[0]
+            : configuredSuperAdminPassword;
+        var superAdmin = await EnsureTestUserAsync(userManager, "admin@safezone.pk", "+92511234567", "SafeZone Administrator", UserRole.SuperAdmin, superAdminPassword, 5.0, 33.6844, 73.0479);
         if (!await userManager.IsInRoleAsync(superAdmin, "SuperAdmin"))
         {
             await userManager.AddToRoleAsync(superAdmin, "SuperAdmin");
         }
+        await SynchronizeConfiguredSuperAdminPasswordAsync(userManager, superAdmin, configuredSuperAdminPassword, logger);
 
         var authorityUser = await EnsureTestUserAsync(userManager, "officer@safezone.pk", "+92511112233", "Inspector Ahmed Khan", UserRole.Authority, GeneratedPasswords[1], 10.0, 33.6938, 73.0560);
         if (!await userManager.IsInRoleAsync(authorityUser, "Authority"))
@@ -153,10 +169,29 @@ public static class SeedData
 
         await context.SaveChangesAsync();
 
-        // Log generated passwords so developers can log in during development
-        logger?.LogInformation(
-            "Seeded user passwords: SuperAdmin={SuperAdminPwd}, Authority={AuthorityPwd}, Resident={ResidentPwd}",
-            GeneratedPasswords[0], GeneratedPasswords[1], GeneratedPasswords[2]);
+    }
+
+    private static async Task SynchronizeConfiguredSuperAdminPasswordAsync(
+        UserManager<User> userManager,
+        User superAdmin,
+        string? configuredPassword,
+        ILogger? logger)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPassword) ||
+            await userManager.CheckPasswordAsync(superAdmin, configuredPassword))
+        {
+            return;
+        }
+
+        var token = await userManager.GeneratePasswordResetTokenAsync(superAdmin);
+        var result = await userManager.ResetPasswordAsync(superAdmin, token, configuredPassword);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Failed to synchronize the configured superadmin password: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        }
+
+        logger?.LogInformation("Synchronized the superadmin password from the configured deployment secret.");
     }
 
     private static async Task<User> EnsureTestUserAsync(

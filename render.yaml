@@ -26,6 +26,8 @@ services:
         value: "true"
       - key: DATABASE_URL
         sync: false
+      - key: SeedData__SuperAdminPassword
+        sync: false
       - key: Gmail__ClientId
         sync: false
       - key: Gmail__ClientSecret
