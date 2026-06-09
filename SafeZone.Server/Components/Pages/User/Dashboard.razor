@@ -6,10 +6,6 @@
 @inject AuthenticationStateProvider AuthState
 @implements IAsyncDisposable
 
-<PageHeader Title="Dashboard" Subtitle="Your neighborhood safety overview." />
-
-<StatusBar />
-
 <div class="stats-row dashboard-stats-row">
     <MetricCard Label="Recent Reports" Value="@RecentIncidents.Count.ToString()" Icon="REP" Accent="primary" Change="Updated live" />
     <MetricCard Label="Active Incidents" Value="@ActiveIncidents.ToString()" Icon="ACT" Accent="warning" />
