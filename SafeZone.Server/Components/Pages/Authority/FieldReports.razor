@@ -4,6 +4,7 @@
 @inject IIncidentService IncidentService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthState
+@inject ToastService ToastSvc
 
 <div class="max-w-7xl mx-auto pb-8 px-4">
     <div class="relative">
@@ -107,6 +108,73 @@
     </div>
 </div>
 
+@if (selectedIncidentDetail is not null)
+{
+    <div class="modal-overlay active" @onclick="CloseIncidentDetail">
+        <div class="modal-content modal-lg" @onclick:stopPropagation>
+            <div class="flex justify-between items-start p-6" style="border-bottom: 1px solid var(--glass-border);">
+                <div>
+                    <h3 class="font-display text-xl font-bold">@selectedIncidentDetail.Title</h3>
+                    <p class="font-mono text-sm text-muted mt-1">@selectedIncidentDetail.IncidentNumber</p>
+                </div>
+                <button class="btn btn-secondary btn-sm w-10 h-10 p-0 flex items-center justify-center"
+                        @onclick="CloseIncidentDetail"
+                        aria-label="Close incident details">&times;</button>
+            </div>
+
+            <div class="p-6">
+                <div class="flex flex-wrap items-center gap-3 mb-6">
+                    <StatusChip Status="@selectedIncidentDetail.Status" />
+                    <span class="badge @GetSeverityBadge(selectedIncidentDetail.Severity)">@GetSeverityLabel(selectedIncidentDetail.Severity)</span>
+                    @if (selectedIncidentDetail.IsFIRFiled)
+                    {
+                        <span class="badge badge-info">FIR Filed</span>
+                    }
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-3 uppercase">Incident Details</p>
+                        <div class="space-y-3">
+                            <div><p class="text-xs text-muted">Category</p><p class="font-medium">@selectedIncidentDetail.CategoryName</p></div>
+                            <div><p class="text-xs text-muted">Reported</p><p class="text-sm">@FormatDateTime(selectedIncidentDetail.ReportedAt)</p></div>
+                            <div><p class="text-xs text-muted">Incident Time</p><p class="text-sm">@(selectedIncidentDetail.IncidentDateTime.HasValue ? FormatDateTime(selectedIncidentDetail.IncidentDateTime.Value) : "Not provided")</p></div>
+                            <div><p class="text-xs text-muted">Reporter</p><p class="text-sm">@(selectedIncidentDetail.ReporterName ?? "Unknown")</p></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted mb-3 uppercase">Location</p>
+                        <div class="space-y-3">
+                            <div><p class="text-xs text-muted">Address</p><p class="text-sm">@(string.IsNullOrWhiteSpace(selectedIncidentDetail.Address) ? "Not provided" : selectedIncidentDetail.Address)</p></div>
+                            <div><p class="text-xs text-muted">Coordinates</p><p class="font-mono text-sm">@selectedIncidentDetail.Latitude.ToString("F6"), @selectedIncidentDetail.Longitude.ToString("F6")</p></div>
+                            <div><p class="text-xs text-muted">Assigned Authority</p><p class="text-sm">@(selectedIncidentDetail.AssignedAuthorityName ?? "Unassigned")</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="text-xs text-muted mb-2 uppercase">Description</p>
+                    <div class="p-4 rounded-lg max-h-52 overflow-y-auto" style="background: var(--glass);">
+                        <p class="text-sm whitespace-pre-wrap">@selectedIncidentDetail.Description</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted">Witness Count</p>
+                        <p class="font-medium">@(selectedIncidentDetail.WitnessCount?.ToString() ?? "Not provided")</p>
+                    </div>
+                    <div class="p-4 rounded-lg" style="background: var(--glass);">
+                        <p class="text-xs text-muted">Estimated Loss</p>
+                        <p class="font-medium">@(selectedIncidentDetail.EstimatedLoss.HasValue ? $"PKR {selectedIncidentDetail.EstimatedLoss:N0}" : "Not provided")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (updatingIncident is not null)
 {
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -156,6 +224,7 @@
     private string severityFilter = "all";
     private string searchQuery = "";
     private List<IncidentListDto> allIncidents = [];
+    private IncidentResponseDto? selectedIncidentDetail;
     private IncidentListDto? updatingIncident;
     private IncidentStatus? selectedNewStatus;
     private string? resolutionNotes;
@@ -231,12 +300,27 @@
         _ => "Unknown"
     };
 
+    private string GetSeverityBadge(SeverityLevel s) => $"badge-severity-{s.ToString().ToLowerInvariant()}";
+
     private string FormatDateTime(DateTime dt) => dt.ToLocalTime().ToString("MMM dd, HH:mm");
 
-    private void ViewIncident(Guid incidentId)
+    private async Task ViewIncident(Guid incidentId)
     {
-        // Navigate to a detail page if available; otherwise no-op
+        try
+        {
+            selectedIncidentDetail = await IncidentService.GetIncidentByIdAsync(incidentId);
+            if (selectedIncidentDetail is null)
+            {
+                ToastSvc.ShowError("Incident details could not be found.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastSvc.ShowError($"Unable to load incident details: {ex.Message}");
+        }
     }
+
+    private void CloseIncidentDetail() => selectedIncidentDetail = null;
 
     private void OpenUpdateStatus(IncidentListDto inc)
     {

@@ -112,7 +112,7 @@ public class IncidentController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Authority,SuperAdmin")]
+    [Authorize(Roles = "Authority,Admin,SuperAdmin")]
     public async Task<ActionResult<List<IncidentListDto>>> GetAllIncidents(
         [FromQuery] int? status,
         [FromQuery] int? severity,
@@ -178,7 +178,7 @@ public class IncidentController : ControllerBase
     }
 
     [HttpPut("{id}/status")]
-    [Authorize(Roles = "Authority,SuperAdmin")]
+    [Authorize(Roles = "Authority,Admin,SuperAdmin")]
     public async Task<ActionResult<IncidentResponseDto>> UpdateStatus(Guid id, [FromQuery] int status)
     {
         if (!Enum.IsDefined(typeof(IncidentStatus), status))
@@ -226,7 +226,7 @@ public class IncidentController : ControllerBase
     }
 
     [HttpGet("stats/counts")]
-    [Authorize(Roles = "Authority,SuperAdmin")]
+    [Authorize(Roles = "Authority,Admin,SuperAdmin")]
     public async Task<ActionResult<object>> GetStats()
     {
         var pending = await _incidentService.GetIncidentCountByStatusAsync(IncidentStatus.Pending);
