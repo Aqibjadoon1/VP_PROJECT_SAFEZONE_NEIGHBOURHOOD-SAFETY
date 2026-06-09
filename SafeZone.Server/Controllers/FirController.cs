@@ -34,8 +34,15 @@ public class FirController : ControllerBase
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 
-        var result = await _firService.CreateFirAsync(dto, userId.Value);
-        return CreatedAtAction(nameof(GetFir), new { id = result.FirId }, result);
+        try
+        {
+            var result = await _firService.CreateFirAsync(dto, userId.Value);
+            return CreatedAtAction(nameof(GetFir), new { id = result.FirId }, result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("{id}")]

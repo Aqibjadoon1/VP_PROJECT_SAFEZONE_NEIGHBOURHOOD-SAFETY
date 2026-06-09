@@ -599,7 +599,11 @@
         {
             var authState = await AuthState.GetAuthenticationStateAsync();
             var user = await UserManager.GetUserAsync(authState.User);
-            var userId = user?.Id;
+            if (user is null)
+            {
+                throw new InvalidOperationException(
+                    "Your session is no longer valid. Please sign in again and resubmit the report.");
+            }
 
             var dto = new CreateIncidentDto
             {
@@ -614,7 +618,7 @@
                 IncidentDateTime = GetIncidentDateTime(),
             };
 
-            var result = await IncidentSvc.CreateIncidentAsync(dto, userId);
+            var result = await IncidentSvc.CreateIncidentAsync(dto, user.Id);
 
             isSuccess = true;
             submittedIncidentId = result.IncidentNumber;

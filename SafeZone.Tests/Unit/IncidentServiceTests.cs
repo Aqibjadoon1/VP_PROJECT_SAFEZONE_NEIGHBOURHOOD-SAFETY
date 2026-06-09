@@ -180,4 +180,87 @@ public class IncidentServiceTests : IDisposable
         Assert.Equal(user.Id, detail!.ReporterId);
         Assert.Equal("Anonymous", detail.ReporterName);
     }
+
+    [Fact]
+    public async Task CreateIncidentAsync_MissingReporter_RejectsExpiredSessionBeforeSaving()
+    {
+        var category = new IncidentCategory
+        {
+            CategoryId = Guid.NewGuid(),
+            Name = "SessionValidationCategory",
+            Icon = "warning",
+            Color = "#ffb800"
+        };
+        _context.IncidentCategories.Add(category);
+        await _context.SaveChangesAsync();
+
+        var dto = new CreateIncidentDto
+        {
+            Title = "Expired session incident",
+            Description = "This should not reach the database insert.",
+            CategoryId = category.CategoryId,
+            Severity = SeverityLevel.Medium,
+            Latitude = 33.5,
+            Longitude = 73.5
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.CreateIncidentAsync(dto, Guid.NewGuid()));
+
+        Assert.Contains("sign in again", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await _context.Incidents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CreateIncidentAsync_OverlongTitle_RejectsFormBeforeSaving()
+    {
+        var category = new IncidentCategory
+        {
+            CategoryId = Guid.NewGuid(),
+            Name = "ValidationCategory"
+        };
+        _context.IncidentCategories.Add(category);
+        await _context.SaveChangesAsync();
+
+        var dto = new CreateIncidentDto
+        {
+            Title = new string('x', 101),
+            Description = "Valid description",
+            CategoryId = category.CategoryId,
+            Latitude = 33.5,
+            Longitude = 73.5
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.CreateIncidentAsync(dto, null));
+
+        Assert.Contains("Title", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await _context.Incidents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CreateIncidentAsync_UnspecifiedIncidentTime_NormalizesToUtc()
+    {
+        var category = new IncidentCategory
+        {
+            CategoryId = Guid.NewGuid(),
+            Name = "UtcCategory"
+        };
+        _context.IncidentCategories.Add(category);
+        await _context.SaveChangesAsync();
+
+        var dto = new CreateIncidentDto
+        {
+            Title = "UTC incident",
+            Description = "Timestamp normalization test",
+            CategoryId = category.CategoryId,
+            Latitude = 33.5,
+            Longitude = 73.5,
+            IncidentDateTime = new DateTime(2026, 6, 9, 20, 30, 0, DateTimeKind.Unspecified)
+        };
+
+        var result = await _service.CreateIncidentAsync(dto, null);
+
+        Assert.Equal(DateTimeKind.Utc, result.IncidentDateTime!.Value.Kind);
+    }
 }

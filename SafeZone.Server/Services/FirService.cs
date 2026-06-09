@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SafeZone.Server.Data;
 using SafeZone.Server.DTOs;
+using SafeZone.Server.Helpers;
 using SafeZone.Server.Models;
 
 namespace SafeZone.Server.Services;
@@ -24,13 +25,21 @@ public class FirService : IFirService
 
     public async Task<FirResponseDto> CreateFirAsync(CreateFirDto dto, Guid reporterId)
     {
-        if (dto is null) throw new ArgumentNullException(nameof(dto));
+        DtoValidation.EnsureValid(dto);
+
+        if (!await _context.Users.AsNoTracking().AnyAsync(u => u.Id == reporterId))
+        {
+            throw new InvalidOperationException(
+                "Your session is no longer valid. Please sign in again and resubmit the FIR.");
+        }
+
         var incidentId = dto.IncidentId ?? Guid.Empty;
         if (incidentId == Guid.Empty)
         {
             var otherCategory = await _context.IncidentCategories.FirstOrDefaultAsync(c => c.Name == "Other")
                 ?? await _context.IncidentCategories.FirstOrDefaultAsync();
-            var categoryId = otherCategory?.CategoryId ?? Guid.Empty;
+            var categoryId = otherCategory?.CategoryId
+                ?? throw new InvalidOperationException("No incident categories are configured. Contact an administrator.");
 
             var incident = new Incident
             {
@@ -46,11 +55,33 @@ public class FirService : IFirService
                 Longitude = dto.IncidentLongitude,
                 Address = dto.IncidentPlace,
                 ReportedAt = DateTime.UtcNow,
+                IncidentDateTime = UtcDateTime.Normalize(dto.IncidentDateTime),
                 IsAnonymous = false
             };
             _context.Incidents.Add(incident);
-            await _context.SaveChangesAsync();
             incidentId = incident.IncidentId;
+        }
+        else
+        {
+            var linkedIncident = await _context.Incidents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.IncidentId == incidentId);
+
+            if (linkedIncident is null)
+            {
+                throw new InvalidOperationException(
+                    "The selected incident no longer exists. Refresh the page and select a valid incident.");
+            }
+
+            if (linkedIncident.ReporterId != reporterId)
+            {
+                throw new InvalidOperationException("You can only file an FIR for an incident reported by your account.");
+            }
+
+            if (await _context.FIRReports.AsNoTracking().AnyAsync(f => f.IncidentId == incidentId))
+            {
+                throw new InvalidOperationException("An FIR has already been filed for the selected incident.");
+            }
         }
 
         var fir = new FIRReport
@@ -64,7 +95,9 @@ public class FirService : IFirService
             ComplainantPhone = dto.ComplainantPhone,
             ComplainantAddress = dto.ComplainantAddress,
             ComplainantFatherName = dto.ComplainantFatherName,
-            ComplainantDateOfBirth = dto.ComplainantDateOfBirth,
+            ComplainantDateOfBirth = dto.ComplainantDateOfBirth.HasValue
+                ? DateTime.SpecifyKind(dto.ComplainantDateOfBirth.Value.Date, DateTimeKind.Utc)
+                : null,
             AccusedDescription = dto.AccusedDescription,
             IncidentNarrative = dto!.IncidentNarrative!,
             WitnessDetails = dto.WitnessDetails,
@@ -72,7 +105,7 @@ public class FirService : IFirService
             EstimatedLoss = dto.EstimatedLoss,
             Status = FIRStatus.Submitted,
             SubmittedAt = DateTime.UtcNow,
-            IncidentDateTime = dto.IncidentDateTime,
+            IncidentDateTime = UtcDateTime.Normalize(dto.IncidentDateTime),
             IncidentPlace = dto.IncidentPlace,
             IncidentLatitude = dto.IncidentLatitude,
             IncidentLongitude = dto.IncidentLongitude,
@@ -85,40 +118,61 @@ public class FirService : IFirService
         };
 
         _context.FIRReports.Add(fir);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            LogPersistenceFailure(ex, fir);
+            throw new InvalidOperationException(
+                "The FIR could not be saved because its account or related incident is no longer valid. Please refresh, sign in again, and try again.",
+                ex);
+        }
 
         var response = await MapToResponseAsync(fir);
+
+        var reporter = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == reporterId)
+            .Select(u => new { u.Email, u.UserName, u.FullName })
+            .FirstOrDefaultAsync();
+        var superAdminEmails = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Role == UserRole.SuperAdmin && u.IsActive)
+            .Select(u => u.Email ?? u.UserName)
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .ToListAsync();
+        var recipientEmail = reporter?.Email ?? reporter?.UserName;
+        var reporterName = reporter?.FullName ?? "User";
+        var firNumber = fir.FIRNumber;
+        var complainantName = fir.ComplainantName;
+        var narrative = fir.IncidentNarrative;
+        var submittedAt = fir.SubmittedAt;
 
         _ = Task.Run(async () =>
         {
             try
             {
                 // Notify reporter
-                var reporter = await _context.Users.FindAsync(reporterId);
-                var recipientEmail = reporter?.Email ?? reporter?.UserName;
                 if (!string.IsNullOrWhiteSpace(recipientEmail) && _gmail != null)
                 {
                     var sent = await _gmail.SendEmailAsync(recipientEmail,
-                        $"FIR {fir.FIRNumber} — Submitted Successfully",
-                        $"Dear {reporter?.FullName ?? "User"},\n\nYour FIR #{fir.FIRNumber} has been submitted successfully and is pending review by the authorities.\n\nYou will be notified when your FIR status changes.\n\n— SafeZone Emergency System");
+                        $"FIR {firNumber} — Submitted Successfully",
+                        $"Dear {reporterName},\n\nYour FIR #{firNumber} has been submitted successfully and is pending review by the authorities.\n\nYou will be notified when your FIR status changes.\n\n— SafeZone Emergency System");
 
                     if (!sent)
                         _logger?.LogWarning("[FIR Notification] Gmail not sent to {Email}", recipientEmail);
                 }
 
                 // Notify all superadmins
-                var superAdmins = await _context.Users
-                    .Where(u => u.Role == UserRole.SuperAdmin && u.IsActive)
-                    .ToListAsync();
-
-                foreach (var admin in superAdmins)
+                foreach (var adminEmail in superAdminEmails)
                 {
-                    var adminEmail = admin.Email ?? admin.UserName;
                     if (!string.IsNullOrWhiteSpace(adminEmail) && _gmail != null)
                     {
                         await _gmail.SendEmailAsync(adminEmail,
-                            $"New FIR Filed: {fir.FIRNumber}",
-                            $"A new FIR has been filed.\n\nFIR #: {fir.FIRNumber}\nComplainant: {fir.ComplainantName}\nIncident: {fir.IncidentNarrative?[..Math.Min(fir.IncidentNarrative.Length, 200)]}\nSubmitted: {fir.SubmittedAt:MMM dd, yyyy HH:mm}\n\nReview at: {_baseUrl}/authority/fir-management");
+                            $"New FIR Filed: {firNumber}",
+                            $"A new FIR has been filed.\n\nFIR #: {firNumber}\nComplainant: {complainantName}\nIncident: {narrative[..Math.Min(narrative.Length, 200)]}\nSubmitted: {submittedAt:MMM dd, yyyy HH:mm}\n\nReview at: {_baseUrl}/authority/fir-management");
                     }
                 }
 
@@ -126,8 +180,8 @@ public class FirService : IFirService
                 if (_slack != null)
                 {
                     await _slack.SendAlertAsync(
-                        $"New FIR Filed: {fir.FIRNumber}",
-                        $"FIR #{fir.FIRNumber} has been filed by {fir.ComplainantName}. Incident: {(fir.IncidentNarrative?.Length > 100 ? fir.IncidentNarrative[..100] + "..." : fir.IncidentNarrative)}",
+                        $"New FIR Filed: {firNumber}",
+                        $"FIR #{firNumber} has been filed by {complainantName}. Incident: {(narrative.Length > 100 ? narrative[..100] + "..." : narrative)}",
                         "Medium");
                 }
             }
@@ -138,6 +192,23 @@ public class FirService : IFirService
         });
 
         return response;
+    }
+
+    private void LogPersistenceFailure(DbUpdateException exception, FIRReport fir)
+    {
+        _logger?.LogError(
+            exception,
+            "FIR persistence failed. Inner error: {InnerError}. FirId={FirId}, ReporterId={ReporterId}, IncidentId={IncidentId}, FirNumber={FirNumber}",
+            exception.GetBaseException().Message,
+            fir.FIRId,
+            fir.ReporterId,
+            fir.IncidentId,
+            fir.FIRNumber);
+
+        foreach (var entry in exception.Entries)
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     public async Task<FirResponseDto?> GetFirByIdAsync(Guid firId)

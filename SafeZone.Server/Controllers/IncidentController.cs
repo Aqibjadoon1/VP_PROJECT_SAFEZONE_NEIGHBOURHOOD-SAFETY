@@ -51,6 +51,9 @@ public class IncidentController : ControllerBase
             return BadRequest(ModelState);
 
         var userId = GetCurrentUserId();
+        if (userId == null)
+            return Unauthorized(new { message = "Your session is no longer valid. Please sign in again." });
+
         try
         {
             var result = await _incidentService.CreateIncidentAsync(dto, userId);

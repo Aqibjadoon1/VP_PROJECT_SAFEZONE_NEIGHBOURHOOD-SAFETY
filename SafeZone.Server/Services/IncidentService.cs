@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SafeZone.Server.Data;
 using SafeZone.Server.DTOs;
+using SafeZone.Server.Helpers;
 using SafeZone.Server.Models;
 
 namespace SafeZone.Server.Services;
@@ -26,9 +27,18 @@ public class IncidentService : IIncidentService
 
     public async Task<IncidentResponseDto> CreateIncidentAsync(CreateIncidentDto dto, Guid? reporterId)
     {
+        DtoValidation.EnsureValid(dto);
+
         var category = await _context.IncidentCategories
             .FirstOrDefaultAsync(c => c.CategoryId == dto.CategoryId)
             ?? throw new InvalidOperationException("Invalid category ID");
+
+        if (reporterId.HasValue &&
+            !await _context.Users.AsNoTracking().AnyAsync(u => u.Id == reporterId.Value))
+        {
+            throw new InvalidOperationException(
+                "Your session is no longer valid. Please sign in again and resubmit the report.");
+        }
 
         var incident = new Incident
         {
@@ -47,14 +57,26 @@ public class IncidentService : IIncidentService
             IsFIRFiled = false,
             EvidenceUrls = dto.EvidenceUrls,
             ReportedAt = DateTime.UtcNow,
-            IncidentDateTime = dto.IncidentDateTime ?? DateTime.UtcNow,
+            IncidentDateTime = dto.IncidentDateTime.HasValue
+                ? UtcDateTime.Normalize(dto.IncidentDateTime.Value)
+                : DateTime.UtcNow,
             WitnessCount = dto.WitnessCount,
             SuspectDescription = dto.SuspectDescription,
             EstimatedLoss = dto.EstimatedLoss
         };
 
         _context.Incidents.Add(incident);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            LogPersistenceFailure(ex, incident);
+            throw new InvalidOperationException(
+                "The incident could not be saved because its account or related data is no longer valid. Please refresh, sign in again, and try again.",
+                ex);
+        }
 
         if (reporterId.HasValue && _gmail != null)
         {
@@ -392,6 +414,23 @@ public class IncidentService : IIncidentService
         }
 
         return number;
+    }
+
+    private void LogPersistenceFailure(DbUpdateException exception, Incident incident)
+    {
+        _logger?.LogError(
+            exception,
+            "Incident persistence failed. Inner error: {InnerError}. IncidentId={IncidentId}, ReporterId={ReporterId}, CategoryId={CategoryId}, IncidentNumber={IncidentNumber}",
+            exception.GetBaseException().Message,
+            incident.IncidentId,
+            incident.ReporterId,
+            incident.CategoryId,
+            incident.IncidentNumber);
+
+        foreach (var entry in exception.Entries)
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     private IncidentResponseDto MapToResponse(Incident incident, IncidentCategory? category)

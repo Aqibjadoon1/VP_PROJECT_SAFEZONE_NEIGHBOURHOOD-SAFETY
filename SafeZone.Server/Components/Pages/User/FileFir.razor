@@ -463,6 +463,7 @@
 
     private async Task HandleSubmit()
     {
+        if (IsSubmitting) return;
         IsSubmitting = true;
 
         try
@@ -501,8 +502,8 @@
         }
         catch (Exception ex)
         {
-            // Log the error and show feedback to the user
             Console.WriteLine($"FIR submission failed: {ex.Message}");
+            ToastSvc.ShowError(ex.Message ?? "Failed to submit FIR. Please refresh and try again.");
             Model.DeclarationAccepted = false;
         }
         finally
