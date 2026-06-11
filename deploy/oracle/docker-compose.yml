@@ -9,7 +9,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__SqliteConnection: Data Source=/data/SafeZone.db
       Jwt__Key: ${JWT_KEY}
-      ElevenLabs__AgentId: agent_7201ktkdw5kteq3abwcn9hjwe0c9
+      ElevenLabs__AgentId: agent_8801kttn6txrem1v8gjy9m0g92w2
       ElevenLabs__AllowUnsignedServerTools: "true"
       Gmail__ClientId: ${GMAIL_CLIENT_ID:-}
       Gmail__ClientSecret: ${GMAIL_CLIENT_SECRET:-}

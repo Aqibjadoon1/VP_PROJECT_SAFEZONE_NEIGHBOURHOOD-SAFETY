@@ -21,7 +21,7 @@ services:
       - key: Jwt__Audience
         value: SafeZoneClient
       - key: ElevenLabs__AgentId
-        value: agent_7201ktkdw5kteq3abwcn9hjwe0c9
+        value: agent_8801kttn6txrem1v8gjy9m0g92w2
       - key: ElevenLabs__AllowUnsignedServerTools
         value: "true"
       - key: DATABASE_URL
