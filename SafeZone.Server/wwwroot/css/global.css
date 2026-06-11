@@ -3934,18 +3934,6 @@ a:hover .safezone-logo .safezone-logo-rungs,
     opacity: 0.5;
 }
 
-/* ============================================
-   ElevenLabs Widget Tactical Styling
-   ============================================ */
-
-/* Style the widget's host element directly */
-elevenlabs-convai {
-    --convai-background: #12121F !important;
-    --convai-border-color: rgba(255,255,255,0.1) !important;
-    --convai-primary-color: #00FF88 !important;
-    --convai-text-color: #FFFFFF !important;
-}
-
 /* ───────────────────────────────────────────────
    SOS Emergency Page — Tactical Red Alert Theme
    ─────────────────────────────────────────────── */
